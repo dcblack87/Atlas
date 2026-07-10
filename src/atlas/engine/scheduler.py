@@ -60,6 +60,7 @@ class Scheduler:
         self._transports: dict[str, Transport] = {}
         self._tasks: list[asyncio.Task] = []
         self._host_down: dict[str, bool] = {}
+        self._reported_up: set[str] = set()  # hosts confirmed reachable this run
 
     def transport_for(self, host: HostConfig) -> Transport:
         if host.name not in self._transports:
@@ -105,7 +106,11 @@ class Scheduler:
             try:
                 obs = await collector.collect(transport, host, ctx)
                 await self._store(collector, host, obs)
-                if strikes >= STRIKES_BEFORE_REPORT or self._host_down.get(host.name):
+                # First success this run confirms the host is up — this also
+                # clears a stale host.up=0 / host_down persisted from a prior
+                # run, which a fresh process would otherwise never overwrite.
+                if host.name not in self._reported_up:
+                    self._reported_up.add(host.name)
                     self._host_down[host.name] = False
                     await self._report_host_up(host)
                     await self.bus.publish(CollectorStatus(host.name, collector.name, ok=True))
@@ -115,6 +120,7 @@ class Scheduler:
                 strikes += 1
                 if strikes >= STRIKES_BEFORE_REPORT and not self._host_down.get(host.name):
                     self._host_down[host.name] = True
+                    self._reported_up.discard(host.name)
                     await self._report_host_down(host, str(e))
                 sleep_s = min(collector.interval * (2 ** min(strikes, 5)), MAX_BACKOFF_S)
             except asyncio.CancelledError:
