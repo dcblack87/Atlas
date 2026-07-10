@@ -7,6 +7,10 @@
 #   ssh root@<atlas-host> -t 'tmux attach -t atlas'
 set -u
 
+# tmux launches a bare shell — make sure uv (default install location) is
+# reachable regardless of profile files.
+export PATH="$HOME/.local/bin:$PATH"
+
 cd "$(dirname "$0")/.."
 
 # Let Atlas's copy keys (OSC 52) pass through tmux to the local clipboard —
