@@ -41,3 +41,34 @@ async def test_host_screen_navigation() -> None:
         assert isinstance(app.screen, HostScreen)
         await pilot.press("escape")
         assert isinstance(app.screen, DashboardScreen)
+
+
+async def test_every_screen_mounts() -> None:
+    from atlas.tui.screens.chat import ChatScreen
+    from atlas.tui.screens.cost import CostScreen
+    from atlas.tui.screens.incidents import IncidentsScreen
+    from atlas.tui.screens.logs import LogsScreen
+    from atlas.tui.screens.reports import ReportsScreen
+    from atlas.tui.screens.security import SecurityScreen
+
+    app = AtlasApp(example_config(), demo=True)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        for key, screen_type in [
+            ("2", IncidentsScreen),
+            ("6", CostScreen),
+            ("7", SecurityScreen),
+            ("8", ReportsScreen),
+            ("l", LogsScreen),
+        ]:
+            await pilot.press(key)
+            assert isinstance(app.screen, screen_type), f"{key} -> {screen_type.__name__}"
+            await pilot.press("escape")
+            assert isinstance(app.screen, DashboardScreen)
+        # chat's Input swallows number keys; check it mounts and pops cleanly
+        await pilot.press("5")
+        assert isinstance(app.screen, ChatScreen)
+        await pilot.press("escape")
+        # deploy is blocked in demo mode
+        await pilot.press("4")
+        assert isinstance(app.screen, DashboardScreen)

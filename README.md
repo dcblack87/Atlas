@@ -43,16 +43,32 @@ uv run atlas run
 
 For an always-on installation, run it in tmux on a server: `tmux new -s atlas scripts/atlas-tmux.sh` — then attach from anything that can SSH, including an e-ink tablet.
 
-## Status
+## What's inside
 
-Early and moving fast. Milestones:
+- **Zero-config discovery** — hosts, containers, multi-tenant sites (from `sites/*/.port`), nginx vhosts, certs, crons, backups, git state. Add a site to your server and it's on the dashboard within one cycle.
+- **Incidents with taste** — a declarative rule table with hysteresis (no flapping), auto-resolve, health scores, and an incident timeline that interleaves deploys and inventory drift. Telegram pages you for critical only.
+- **Audited deploys** — preflight sha comparison, a typed-confirmation gate, streamed output, hard timeout, post-deploy verification of every container and endpoint (every *site* for multi-tenant apps), guided rollback, and a full audit trail. One fleet-wide mutation lock.
+- **AI that pays its own way** — a hard daily budget enforced *before* every call, spend recorded from actual API usage, prompt caching, per-entity cooldowns. Incident explanations (`e`), host summaries (`E`), streaming chat (`5`) grounded in live SQL — no vector DB.
+- **It learns your normal** — 4-week hour-of-week baselines detect anomalies ("RAM is 4.5× its norm — began 20 min after deploy 8f31a2") and least-squares forecasting warns *before* the disk fills ("full in ~14 days").
+- **Deploy drift** — deployed sha vs origin/main via the GitHub API, plus CI status and open PRs beside the infra they'll land on.
+- **Costs** — real monthly figures from the Hetzner Cloud API (read-only tokens) next to your Claude spend.
+- **Briefs** — a deterministic morning/weekly status skeleton with an optional AI narrative on top. Budget exhausted? The skeleton ships anyway.
+
+## Security model
+
+- **Read-only by default.** Exactly one module (`atlas/deploy/`) can construct a mutating command — enforced by a test in CI, not a convention.
+- **Every mutation is gated**: typed confirmation phrase (stored in the audit row), allowlisted remediation templates, sanitised parameters, fleet-wide lock, hard timeout.
+- **No cloud credentials needed** beyond read-only billing tokens. SSH uses a dedicated key over your tailnet with trust-on-first-use host pinning.
+- **Secrets never reach git**: real inventory lives in a gitignored `atlas.toml`, CI runs gitleaks, and AI context bundles scrub credentials, URL passwords, and high-entropy tokens.
+
+## Milestones
 
 - [x] **M0** — skeleton: config, TUI shell, display profiles (standard / eink / glance)
-- [ ] **M1** — fleet visibility: SSH/local collectors, discovery, live dashboard
-- [ ] **M2** — incidents: rules engine, health scores, Telegram alerts, demo mode
-- [ ] **M3** — deploys: audited push-button deploys with post-deploy verification
-- [ ] **M4** — AI: budget-capped insights, incident explanation, grounded chat
-- [ ] **M5** — intelligence: baselines & anomaly detection, deploy drift, cost dashboard, briefs
+- [x] **M1** — fleet visibility: SSH/local collectors, discovery, live dashboard
+- [x] **M2** — incidents: rules engine, health scores, Telegram alerts, demo mode
+- [x] **M3** — deploys: audited push-button deploys with post-deploy verification
+- [x] **M4** — AI: budget-capped insights, incident explanation, grounded chat, context bundles
+- [x] **M5** — intelligence: baselines & anomaly detection, forecasting, deploy drift, costs, security audit, briefs
 
 ## Design
 

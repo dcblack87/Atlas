@@ -6,9 +6,11 @@ from atlas.collectors import (  # noqa: F401
     cron,
     discovery,
     docker_,
+    github_,
     http_health,
     nginx,
     postgres,
+    security,
     system,
 )
 from atlas.collectors.base import REGISTRY, Collector, register

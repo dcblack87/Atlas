@@ -144,4 +144,18 @@ FACT_RULES: tuple[FactRule, ...] = (
         crit=54,
         title="newest backup for {entity} is {value}h old",
     ),
+    FactRule(
+        "deploy_drift",
+        "drift.commits_behind",
+        warn=5,
+        title="{entity} is {value} commits behind origin/main",
+    ),
+    FactRule(
+        "disk_forecast",
+        "forecast.disk_full_days",
+        warn=14,
+        crit=5,
+        below=True,
+        title="disk on {entity} full in ~{value} days at current growth",
+    ),
 )
