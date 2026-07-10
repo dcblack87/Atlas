@@ -16,6 +16,7 @@ from textual.binding import Binding, BindingType
 from atlas.config import Config
 from atlas.model import PROFILE_ORDER, PROFILES, DisplayProfile
 from atlas.runtime import Runtime
+from atlas.tui.screens.apps import AppsScreen
 from atlas.tui.screens.chat import ChatScreen
 from atlas.tui.screens.cost import CostScreen
 from atlas.tui.screens.dashboard import DashboardScreen
@@ -42,6 +43,7 @@ class AtlasApp(App[None]):
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("1", "goto('dashboard')", "Dashboard"),
         Binding("2", "goto('incidents')", "Incidents"),
+        Binding("3", "goto('apps')", "Apps"),
         Binding("4", "goto('deploy')", "Deploy"),
         Binding("5", "goto('chat')", "Chat"),
         Binding("6", "goto('cost')", "Cost"),
@@ -133,6 +135,9 @@ class AtlasApp(App[None]):
             case "incidents":
                 if not isinstance(self.screen, IncidentsScreen):
                     self.push_screen(IncidentsScreen())
+            case "apps":
+                if not isinstance(self.screen, AppsScreen):
+                    self.push_screen(AppsScreen())
             case "deploy":
                 if self.demo:
                     self.notify("deploys are disabled in demo mode", timeout=3)
@@ -171,7 +176,8 @@ class AtlasApp(App[None]):
 
     def action_help(self) -> None:
         self.notify(
-            "1 Dashboard · 2 Incidents · 4 Deploy · 5 Chat · 6 Cost · 7 Security · "
-            "8 Reports · h Hosts · l Logs · b Bundle · F2 display profile · q quit",
+            "1 Dashboard · 2 Incidents · 3 Apps · 4 Deploy · 5 Chat · 6 Cost · "
+            "7 Security · 8 Reports · h Hosts · l Logs · b Bundle · c Copy · "
+            "F2/p display profile · q quit",
             timeout=4,
         )
