@@ -8,7 +8,7 @@ display precision never causes a repaint — that's what keeps e-ink still.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from textual.app import ComposeResult
 from textual.containers import Grid
@@ -44,7 +44,27 @@ class DashboardScreen(Screen):
     }
     """
 
+    BINDINGS: ClassVar = [("c", "copy_summary", "Copy")]
+
     _timer: Timer | None = None
+
+    def action_copy_summary(self) -> None:
+        from datetime import datetime
+
+        from atlas.tui.clipboard import copy_text
+
+        tiles = {
+            tile_id: self.query_one(f"#{tile_id}", StatTile).value
+            for tile_id in ("health", "hosts-count", "apps-count", "incidents")
+        }
+        parts = [
+            f"ATLAS fleet summary — {datetime.now():%Y-%m-%d %H:%M}",
+            f"health {tiles['health']} | hosts {tiles['hosts-count']} | "
+            f"apps {tiles['apps-count']} | open incidents {tiles['incidents']}",
+            getattr(self.query_one("#hosts", Static), "_atlas_last", "") or "",
+            getattr(self.query_one("#apps", Static), "_atlas_last", "") or "",
+        ]
+        copy_text(self, "\n\n".join(p for p in parts if p), "fleet summary")
 
     def compose(self) -> ComposeResult:
         yield Static("ATLAS", id="banner")
