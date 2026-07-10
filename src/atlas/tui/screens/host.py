@@ -26,7 +26,7 @@ class HostScreen(Screen):
     DEFAULT_CSS = """
     HostScreen #picker { width: 26; border: round $primary 60%; }
     HostScreen #detail { border: round $primary 60%; }
-    HostScreen #summary { height: 3; padding: 0 1; }
+    HostScreen #summary { height: 4; padding: 0 1; }
     """
 
     BINDINGS: ClassVar = [
@@ -90,13 +90,21 @@ class HostScreen(Screen):
         rt = atlas.runtime
         host_key = f"host:{host_name}"
 
+        from atlas.engine.capacity import host_headroom
+
         snap = await rt.metrics.latest_snapshot(host_key)
+        headroom = await host_headroom(rt.metrics, host_name)
         summary = (
             f"{host_name}   "
             f"load {snap.get('load.1m', 0):.2f}   "
             f"mem {snap.get('mem.used_pct', 0):.0f}%   "
             f"disk {snap.get('disk.used_pct', 0):.0f}%"
         )
+        if headroom is not None:
+            summary += (
+                f"\nheadroom   {headroom.ram_free_mb / 1024:.1f} GB RAM free   "
+                f"{headroom.disk_free_mb / 1024:.1f} GB disk free"
+            )
         widget = self.query_one("#summary", Static)
         if getattr(widget, "_atlas_last", None) != summary:
             widget._atlas_last = summary  # type: ignore[attr-defined]

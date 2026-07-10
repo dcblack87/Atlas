@@ -139,6 +139,22 @@ class AppsScreen(Screen):
                 port = site["attrs"].get("port", "?")
                 lines.append(f"  {glyph} {site['key'].split('/')[-1]:<22} :{port}  {latency}")
 
+            # capacity: how many more sites will this host hold?
+            from atlas.engine.capacity import site_capacity
+
+            if host:
+                cap = await site_capacity(rt.inventory, rt.metrics, entity, host)
+                if cap is not None and cap.known:
+                    verb = "more site fits" if cap.additional_sites == 1 else "more sites fit"
+                    lines.append(
+                        f"\nCAPACITY  room for ~{cap.additional_sites} {verb} "
+                        f"({cap.bound_by}-bound)"
+                    )
+                    lines.append(
+                        f"  ~{cap.avg_site_mb:.0f} MB/site, "
+                        f"{cap.ram_free_mb / 1024:.1f} GB RAM free"
+                    )
+
         # containers on the app's host that belong to it (name-prefix heuristic
         # covers the compose and single-container conventions)
         if host:
