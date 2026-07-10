@@ -43,6 +43,21 @@ async def test_host_screen_navigation() -> None:
         assert isinstance(app.screen, DashboardScreen)
 
 
+async def test_dashboard_key_never_blanks_the_screen() -> None:
+    """Pressing 1 while already on the dashboard must not pop it off the
+    stack (the bottom of the Textual stack is a blank default screen)."""
+    app = AtlasApp(example_config(), demo=True)
+    async with app.run_test() as pilot:
+        await pilot.press("1")
+        assert isinstance(app.screen, DashboardScreen)
+        await pilot.press("1")  # twice — the original repro
+        assert isinstance(app.screen, DashboardScreen)
+        # and from two screens deep it returns to the dashboard
+        await pilot.press("h")
+        await pilot.press("1")
+        assert isinstance(app.screen, DashboardScreen)
+
+
 async def test_every_screen_mounts() -> None:
     from atlas.tui.screens.chat import ChatScreen
     from atlas.tui.screens.cost import CostScreen
