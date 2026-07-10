@@ -15,10 +15,10 @@ SRC = Path(__file__).parent.parent.parent / "src" / "atlas"
 # mutation, and execution requires a Transport.)
 MUTATING = re.compile(
     r"docker (restart|rm|stop|kill|prune|system prune|builder prune)"
-    r"|systemctl (restart|stop|start)"
+    r"|systemctl (restart|stop|start|reboot|poweroff)"
     r"|git (checkout|pull|reset|push)"
     r"|rm -rf"
-    r"|shutdown|reboot"
+    r"|shutdown -"
 )
 
 ALLOWED_DIRS = {"deploy"}

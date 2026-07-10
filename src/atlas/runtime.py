@@ -102,15 +102,50 @@ class Runtime:
         await self.db.close()
 
     async def _housekeeping(self) -> None:
-        """Sweep fact rules + stale assertions every minute; retention hourly."""
-        last_retention = 0.0
+        """The slow heartbeat: incident sweep every minute; retention,
+        forecasts, baselines, and cloud costs hourly; briefs when due."""
+        import time as _time
+
+        from atlas.cost.hcloud import collect_costs
+        from atlas.engine.baseline import run_anomaly_detection
+        from atlas.engine.forecast import run_forecasts
+        from atlas.reports.briefs import due_brief, generate_brief
+
+        last_hourly = 0.0
+        # seed from the archive so a restart doesn't re-send today's brief
+        last_daily_brief = float(
+            await self.db.fetch_value(
+                "SELECT COALESCE(MAX(ts), 0) FROM ai_analyses WHERE kind LIKE 'brief%'"
+            )
+            or 0
+        )
+        last_weekly_brief = float(
+            await self.db.fetch_value(
+                "SELECT COALESCE(MAX(ts), 0) FROM ai_analyses WHERE kind LIKE 'weekly_brief%'"
+            )
+            or 0
+        )
         while True:
             await asyncio.sleep(SWEEP_INTERVAL_S)
             try:
                 await self.incidents.sweep()
                 loop_time = asyncio.get_running_loop().time()
-                if loop_time - last_retention > RETENTION_INTERVAL_S:
-                    last_retention = loop_time
+                if loop_time - last_hourly > RETENTION_INTERVAL_S:
+                    last_hourly = loop_time
                     await run_retention(self.db)
+                    await run_forecasts(self.db)
+                    await run_anomaly_detection(self.db, self.bus)
+                    if self.config is not None:
+                        await collect_costs(self.config.hcloud, self.db)
+                due = due_brief(_time.time(), last_daily_brief, last_weekly_brief)
+                if due is not None:
+                    body = await generate_brief(
+                        self.db, self.ai, self.context, weekly=due == "weekly"
+                    )
+                    log.info("generated %s brief (%d chars)", due, len(body))
+                    if due == "weekly":
+                        last_weekly_brief = _time.time()
+                    else:
+                        last_daily_brief = _time.time()
             except Exception:
                 log.exception("housekeeping pass failed")

@@ -136,3 +136,19 @@ async def seed_demo(db: Database) -> None:
     )
     await incidents.resolve(resolved, "recovered after container restart")
     await incidents.add_event(None, "deploy", "deployed exampleapp 8f31a2c → d3adb33 ✓")
+
+    # M5 texture: costs, drift, security posture, a forecast
+    for host, cost in (("web-1", 16.18), ("web-2", 8.51), ("sites-1", 8.51)):
+        await inventory.set_fact(f"host:{host}", "cost.monthly_eur", cost)
+    await inventory.set_fact("project:demo", "cost.monthly_eur", 33.20)
+    await inventory.set_fact("app:shopfront", "drift.commits_behind", 3)
+    await inventory.set_fact("app:shopfront", "github.ci_status", "success")
+    await inventory.set_fact("app:shopfront", "github.open_prs", 2)
+    await inventory.set_fact("host:web-2", "forecast.disk_full_days", 43.5)
+    for host in HOSTS:
+        await inventory.set_fact(f"host:{host}", "security.pending_updates", rng.randint(0, 14))
+        await inventory.set_fact(f"host:{host}", "security.reboot_required", host == "sites-1")
+        await inventory.set_fact(f"host:{host}", "security.public_ports", [22, 80, 443])
+        await metrics.write(
+            [Sample("security.failed_auth_1h", float(rng.randint(0, 40)), f"host:{host}")]
+        )

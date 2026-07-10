@@ -23,6 +23,8 @@ from atlas.tui.screens.deploy import DeployScreen
 from atlas.tui.screens.host import HostScreen
 from atlas.tui.screens.incidents import IncidentsScreen
 from atlas.tui.screens.logs import LogsScreen
+from atlas.tui.screens.reports import ReportsScreen
+from atlas.tui.screens.security import SecurityScreen
 
 _THEMES_DIR = Path(__file__).parent / "tui" / "themes"
 
@@ -43,6 +45,8 @@ class AtlasApp(App[None]):
         Binding("4", "goto('deploy')", "Deploy"),
         Binding("5", "goto('chat')", "Chat"),
         Binding("6", "goto('cost')", "Cost"),
+        Binding("7", "goto('security')", "Security"),
+        Binding("8", "goto('reports')", "Reports"),
         Binding("h", "goto('hosts')", "Hosts"),
         Binding("l", "goto('logs')", "Logs"),
         Binding("b", "bundle", "Bundle"),
@@ -137,6 +141,12 @@ class AtlasApp(App[None]):
             case "cost":
                 if not isinstance(self.screen, CostScreen):
                     self.push_screen(CostScreen())
+            case "security":
+                if not isinstance(self.screen, SecurityScreen):
+                    self.push_screen(SecurityScreen())
+            case "reports":
+                if not isinstance(self.screen, ReportsScreen):
+                    self.push_screen(ReportsScreen())
             case _:
                 self.notify(f"{target} — coming soon", severity="warning", timeout=2)
 
@@ -155,7 +165,7 @@ class AtlasApp(App[None]):
 
     def action_help(self) -> None:
         self.notify(
-            "1 Dashboard · 2 Incidents · 4 Deploy · 5 Chat · 6 Cost · h Hosts · "
-            "l Logs · b Bundle · F2 display profile · q quit",
+            "1 Dashboard · 2 Incidents · 4 Deploy · 5 Chat · 6 Cost · 7 Security · "
+            "8 Reports · h Hosts · l Logs · b Bundle · F2 display profile · q quit",
             timeout=4,
         )

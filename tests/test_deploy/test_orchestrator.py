@@ -160,7 +160,7 @@ async def test_remediation_allowlist(env) -> None:
 
 
 async def test_remediation_rejects_hostile_params(env) -> None:
-    orchestrator, transport, *_ = env
+    orchestrator, _transport, *_ = env
     with pytest.raises(DeployError, match="missing remediation parameter"):
         async for _ in orchestrator.remediate(
             "web-1", "docker restart {container}", {"container": "x; rm -rf /"}, "web-1"

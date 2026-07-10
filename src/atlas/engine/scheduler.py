@@ -16,7 +16,7 @@ import time
 from atlas.bus import Bus, CollectorStatus, FindingsEvent, InventoryChanged, SamplesEvent
 from atlas.collectors import REGISTRY
 from atlas.collectors.base import Collector
-from atlas.config import AppConfig, Config, HostConfig
+from atlas.config import AppConfig, Config, GithubSection, HostConfig
 from atlas.model import Entity, EntityKind, Finding, Sample, Severity
 from atlas.store.db import Database
 from atlas.store.inventory import Inventory
@@ -33,12 +33,21 @@ STRIKES_BEFORE_REPORT = 3
 class HostContext:
     """What collectors may know about the world beyond their own command."""
 
-    def __init__(self, apps: dict[str, AppConfig], inventory: Inventory) -> None:
+    def __init__(
+        self,
+        apps: dict[str, AppConfig],
+        inventory: Inventory,
+        github: GithubSection | None = None,
+    ) -> None:
         self.apps = apps
+        self.github = github
         self._inventory = inventory
 
     async def sites_for(self, app_name: str) -> list[dict]:
         return await self._inventory.entities(kind="site", parent=f"app:{app_name}")
+
+    async def fact(self, entity_key: str, name: str) -> object | None:
+        return await self._inventory.get_fact(entity_key, name)
 
 
 class Scheduler:
@@ -61,7 +70,7 @@ class Scheduler:
         return self._transports[host.name]
 
     async def start(self) -> None:
-        ctx = HostContext(self.config.apps, self.inventory)
+        ctx = HostContext(self.config.apps, self.inventory, self.config.github)
         for host in self.config.hosts:
             await self.inventory.upsert(
                 Entity(EntityKind.HOST, f"host:{host.name}", attrs={"address": host.address})
