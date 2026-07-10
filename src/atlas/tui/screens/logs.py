@@ -23,7 +23,15 @@ class LogsScreen(Screen):
     LogsScreen #log { border: round $primary 60%; }
     """
 
-    BINDINGS: ClassVar = [("escape", "app.pop_screen", "Back")]
+    BINDINGS: ClassVar = [
+        ("escape", "app.pop_screen", "Back"),
+        ("c", "copy_log", "Copy"),
+    ]
+
+    def action_copy_log(self) -> None:
+        from atlas.tui.clipboard import copy_text
+
+        copy_text(self, self.query_one("#log", StreamLog).text, "log tail")
 
     def compose(self) -> ComposeResult:
         with Horizontal():

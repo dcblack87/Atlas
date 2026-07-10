@@ -22,7 +22,20 @@ class ChatScreen(Screen):
     ChatScreen Input { dock: bottom; }
     """
 
-    BINDINGS: ClassVar = [("escape", "app.pop_screen", "Back")]
+    # ctrl+y (not plain c) because the question Input owns printable keys
+    BINDINGS: ClassVar = [
+        ("escape", "app.pop_screen", "Back"),
+        ("ctrl+y", "copy_answer", "Copy answer"),
+    ]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._last_answer = ""
+
+    def action_copy_answer(self) -> None:
+        from atlas.tui.clipboard import copy_text
+
+        copy_text(self, self._last_answer, "last answer")
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -58,9 +71,11 @@ class ChatScreen(Screen):
             return
         transcript.push("atlas ›")  # noqa: RUF001
         buffer = ""
+        self._last_answer = ""
         try:
             async for delta in rt.chat.ask(question):
                 buffer += delta
+                self._last_answer += delta
                 # flush completed lines; StreamLog handles e-ink coalescing
                 while "\n" in buffer:
                     line, _, buffer = buffer.partition("\n")

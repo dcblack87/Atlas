@@ -24,7 +24,14 @@ class ReportsScreen(Screen):
     BINDINGS: ClassVar = [
         ("escape", "app.pop_screen", "Back"),
         ("g", "generate", "Generate now"),
+        ("c", "copy_brief", "Copy"),
     ]
+
+    def action_copy_brief(self) -> None:
+        from atlas.tui.clipboard import copy_text
+
+        body = self.query_one("#body", Static).renderable
+        copy_text(self, str(body), "brief")
 
     def compose(self) -> ComposeResult:
         with Horizontal():

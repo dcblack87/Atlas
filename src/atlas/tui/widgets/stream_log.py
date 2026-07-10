@@ -14,8 +14,14 @@ class StreamLog(RichLog):
     def __init__(self, *, id: str | None = None) -> None:
         super().__init__(id=id, highlight=False, markup=False, wrap=True, auto_scroll=True)
         self._buffer: list[str] = []
+        self._history: list[str] = []  # everything ever pushed — the copy source
         self._flush_timer: Timer | None = None
         self._flush_period = 0.0
+
+    @property
+    def text(self) -> str:
+        """Full content (including anything still buffered) for copying."""
+        return "\n".join(self._history + self._buffer)
 
     def set_flush_period(self, seconds: float) -> None:
         """0 = live append; >0 = coalesce writes on this clock."""
@@ -30,11 +36,18 @@ class StreamLog(RichLog):
         if self._flush_period > 0:
             self._buffer.append(line)
         else:
+            self._history.append(line)
             self.write(line)
+
+    def clear(self):  # type: ignore[override]
+        self._history.clear()
+        self._buffer.clear()
+        return super().clear()
 
     def _flush(self) -> None:
         if self._buffer:
             self.write("\n".join(self._buffer))
+            self._history.extend(self._buffer)
             self._buffer.clear()
 
     def finish(self) -> None:
