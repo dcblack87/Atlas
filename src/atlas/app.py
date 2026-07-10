@@ -18,6 +18,7 @@ from atlas.model import PROFILE_ORDER, PROFILES, DisplayProfile
 from atlas.runtime import Runtime
 from atlas.tui.screens.dashboard import DashboardScreen
 from atlas.tui.screens.host import HostScreen
+from atlas.tui.screens.incidents import IncidentsScreen
 
 _THEMES_DIR = Path(__file__).parent / "tui" / "themes"
 
@@ -34,6 +35,7 @@ class AtlasApp(App[None]):
 
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("1", "goto('dashboard')", "Dashboard"),
+        Binding("2", "goto('incidents')", "Incidents"),
         Binding("h", "goto('hosts')", "Hosts"),
         Binding("f2", "cycle_profile", "Display"),
         Binding("question_mark", "help", "Help", key_display="?"),
@@ -55,17 +57,30 @@ class AtlasApp(App[None]):
     def on_mount(self) -> None:
         self._apply_profile(self.profile, announce=False)
         self.push_screen(DashboardScreen())
-        if self.config is not None and not self.demo:
+        if self.demo:
+            self.run_worker(self._start_demo(), exclusive=True)
+        elif self.config is not None:
             self.run_worker(self._start_runtime(), exclusive=True)
 
     async def _start_runtime(self) -> None:
         assert self.config is not None
         self.runtime = await Runtime.start(self.config)
 
+    async def _start_demo(self) -> None:
+        self.runtime = await Runtime.demo()
+        self.notify("Demo fleet loaded — nothing here is real", timeout=4)
+
     async def action_quit(self) -> None:
-        if self.runtime is not None:
-            await self.runtime.stop()
+        await self._stop_runtime()
         self.exit()
+
+    async def on_unmount(self) -> None:
+        await self._stop_runtime()
+
+    async def _stop_runtime(self) -> None:
+        if self.runtime is not None:
+            runtime, self.runtime = self.runtime, None
+            await runtime.stop()
 
     # ── display profiles ─────────────────────────────────────────────
 
@@ -96,8 +111,11 @@ class AtlasApp(App[None]):
             case "hosts":
                 if not isinstance(self.screen, HostScreen):
                     self.push_screen(HostScreen())
+            case "incidents":
+                if not isinstance(self.screen, IncidentsScreen):
+                    self.push_screen(IncidentsScreen())
             case _:
                 self.notify(f"{target} — coming soon", severity="warning", timeout=2)
 
     def action_help(self) -> None:
-        self.notify("1 Dashboard · h Hosts · F2 display profile · q quit", timeout=4)
+        self.notify("1 Dashboard · 2 Incidents · h Hosts · F2 display profile · q quit", timeout=4)
