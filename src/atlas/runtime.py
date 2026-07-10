@@ -13,6 +13,10 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from atlas.ai.chat import ChatSession
+from atlas.ai.client import AIClient
+from atlas.ai.context import ContextBuilder
+from atlas.ai.insights import InsightEngine
 from atlas.bus import Bus
 from atlas.config import Config
 from atlas.deploy.orchestrator import DeployOrchestrator
@@ -40,6 +44,10 @@ class Runtime:
     scheduler: Scheduler | None = None
     notifier: TelegramNotifier | None = None
     deployer: DeployOrchestrator | None = None
+    ai: AIClient | None = None
+    context: ContextBuilder | None = None
+    insights: InsightEngine | None = None
+    chat: ChatSession | None = None
     _tasks: list[asyncio.Task] = field(default_factory=list)
 
     @classmethod
@@ -57,8 +65,19 @@ class Runtime:
         runtime = cls(
             config, db, bus, Inventory(db), Metrics(db), incidents, scheduler, notifier, deployer
         )
+        runtime._wire_ai(config, db, bus)
         runtime._tasks.append(asyncio.create_task(runtime._housekeeping(), name="housekeeping"))
         return runtime
+
+    def _wire_ai(self, config: Config, db: Database, bus: Bus) -> None:
+        if not (config.ai.enabled and config.ai.resolve_api_key()):
+            log.info("AI layer disabled (no key or disabled in config)")
+            return
+        self.ai = AIClient(config.ai, db)
+        self.context = ContextBuilder(db)
+        self.insights = InsightEngine(self.ai, self.context, self.incidents.store, bus)
+        self.insights.attach()
+        self.chat = ChatSession(self.ai, self.context)
 
     @classmethod
     async def demo(cls) -> Runtime:

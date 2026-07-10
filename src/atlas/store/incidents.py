@@ -47,6 +47,10 @@ class IncidentStore:
         )
         await self.add_event(incident_id, "acked", "acknowledged")
 
+    async def get(self, incident_id: int) -> dict | None:
+        row = await self._db.fetch_one("SELECT * FROM incidents WHERE id = ?", (incident_id,))
+        return dict(row) if row else None
+
     async def find_open(self, rule_id: str, entity_key: str) -> dict | None:
         row = await self._db.fetch_one(
             """

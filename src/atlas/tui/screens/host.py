@@ -29,7 +29,10 @@ class HostScreen(Screen):
     HostScreen #summary { height: 3; padding: 0 1; }
     """
 
-    BINDINGS: ClassVar = [("escape", "app.pop_screen", "Back")]
+    BINDINGS: ClassVar = [
+        ("escape", "app.pop_screen", "Back"),
+        ("E", "explain", "Explain (AI)"),
+    ]
 
     def __init__(self) -> None:
         super().__init__()
@@ -125,6 +128,27 @@ class HostScreen(Screen):
                 for col in COLUMNS:
                     if table.get_cell(key, col) != cells[col]:
                         table.update_cell(key, col, cells[col])
+
+    def action_explain(self) -> None:
+        host_name = self._selected_host()
+        if host_name is not None:
+            self.run_worker(self._explain(f"host:{host_name}"), exclusive=True, group="explain")
+
+    async def _explain(self, entity_key: str) -> None:
+        from atlas.ai.client import AIDisabled, BudgetExhausted
+        from atlas.tui.widgets.modal import TextModal
+
+        rt = self.atlas.runtime
+        if rt is None or rt.insights is None:
+            self.notify("AI is not configured (set ANTHROPIC_API_KEY)", timeout=4)
+            return
+        self.notify("asking Claude…", timeout=3)
+        try:
+            text = await rt.insights.explain_entity(entity_key)
+        except (BudgetExhausted, AIDisabled) as e:
+            self.notify(str(e), severity="warning", timeout=5)
+            return
+        self.app.push_screen(TextModal(f"{entity_key} — AI summary", text))
 
 
 def _fmt_opt(value: float | None, spec: str) -> str:

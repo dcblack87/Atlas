@@ -33,6 +33,7 @@ class IncidentsScreen(Screen):
     BINDINGS: ClassVar = [
         ("escape", "app.pop_screen", "Back"),
         ("a", "acknowledge", "Ack"),
+        ("e", "explain", "Explain (AI)"),
     ]
 
     def __init__(self) -> None:
@@ -112,15 +113,41 @@ class IncidentsScreen(Screen):
             widget._atlas_last = text  # type: ignore[attr-defined]
             widget.update(text)
 
+    def _selected_incident(self) -> int | None:
+        table = self.query_one("#open", DataTable)
+        if table.cursor_row is None or table.row_count == 0:
+            return None
+        row_key = table.coordinate_to_cell_key(Coordinate(table.cursor_row, 0)).row_key.value
+        return int(row_key) if row_key else None
+
     async def action_acknowledge(self) -> None:
         rt = self.atlas.runtime
-        table = self.query_one("#open", DataTable)
-        if rt is None or rt.incidents is None or table.cursor_row is None:
-            return
-        row_key = table.coordinate_to_cell_key(Coordinate(table.cursor_row, 0)).row_key.value
-        if row_key:
-            await rt.incidents.store.acknowledge(int(row_key))
+        incident_id = self._selected_incident()
+        if rt is not None and incident_id is not None:
+            await rt.incidents.store.acknowledge(incident_id)
             self.refresh_data()
+
+    def action_explain(self) -> None:
+        incident_id = self._selected_incident()
+        if incident_id is not None:
+            self.run_worker(self._explain(incident_id), exclusive=True, group="explain")
+
+    async def _explain(self, incident_id: int) -> None:
+        from atlas.ai.client import AIDisabled, BudgetExhausted
+        from atlas.tui.widgets.modal import TextModal
+
+        rt = self.atlas.runtime
+        if rt is None or rt.insights is None:
+            self.notify("AI is not configured (set ANTHROPIC_API_KEY)", timeout=4)
+            return
+        self.notify("asking Claude…", timeout=3)
+        try:
+            text = await rt.insights.explain_incident(incident_id)
+        except (BudgetExhausted, AIDisabled) as e:
+            self.notify(str(e), severity="warning", timeout=5)
+            return
+        self.app.push_screen(TextModal(f"Incident #{incident_id} — AI analysis", text))
+        self.refresh_data()  # the insight also landed on the timeline
 
 
 def _ago(ts: int) -> str:
