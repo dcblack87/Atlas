@@ -1,0 +1,4 @@
+courtapp-backend	3.42%	412.3MiB / 15.24GiB	2.64%
+courtapp-frontend	0.11%	98.7MiB / 15.24GiB	0.63%
+courtapp-postgres	0.03%	62MiB / 15.24GiB	0.40%
+courtapp-redis	0.20%	9.5MiB / 15.24GiB	0.06%
