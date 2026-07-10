@@ -30,11 +30,23 @@ class DeployScreen(Screen):
     """
 
     BINDINGS: ClassVar = [
-        ("escape", "app.pop_screen", "Back"),
+        ("escape", "back", "Back"),
         ("d", "deploy", "Deploy"),
         ("r", "rollback", "Rollback"),
         ("c", "copy_output", "Copy"),
     ]
+
+    def action_back(self) -> None:
+        # Leaving the screen would cancel the worker and kill the remote
+        # deploy mid-flight — the screen is locked until it finishes.
+        if self._deploying:
+            self.notify(
+                "deploy in progress — wait for verification to finish",
+                severity="warning",
+                timeout=4,
+            )
+            return
+        self.app.pop_screen()
 
     def action_copy_output(self) -> None:
         from atlas.tui.clipboard import copy_text
@@ -168,13 +180,16 @@ class DeployScreen(Screen):
         self._deploying = True
         try:
             async for line in rt.deployer.deploy(app_name, phrase, checkout_sha=checkout_sha):
-                stream.push(line)
+                if self.is_mounted:
+                    stream.push(line)
         except DeployError as e:
             stream.push(f"✖ {e}")
         finally:
-            stream.finish()
             self._deploying = False
-            await self._run_preflight()
+            # the screen may be gone if the worker was cancelled from outside
+            if self.is_mounted:
+                stream.finish()
+                await self._run_preflight()
 
 
 def _short(sha: str | None) -> str:
