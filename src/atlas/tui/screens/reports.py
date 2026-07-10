@@ -30,8 +30,7 @@ class ReportsScreen(Screen):
     def action_copy_brief(self) -> None:
         from atlas.tui.clipboard import copy_text
 
-        body = self.query_one("#body", Static).renderable
-        copy_text(self, str(body), "brief")
+        copy_text(self, getattr(self, "_shown", ""), "brief")
 
     def compose(self) -> ComposeResult:
         with Horizontal():
@@ -75,6 +74,7 @@ class ReportsScreen(Screen):
         body = await rt.db.fetch_value(
             "SELECT response FROM ai_analyses WHERE id = ?", (analysis_id,)
         )
+        self._shown = body or ""
         self.query_one("#body", Static).update(body or "empty")
 
     def action_generate(self) -> None:
@@ -90,5 +90,6 @@ class ReportsScreen(Screen):
         self.notify("generating brief…", timeout=3)
         context = rt.context or ContextBuilder(rt.db)
         body = await generate_brief(rt.db, rt.ai, context)
+        self._shown = body
         self.query_one("#body", Static).update(body)
         await self._load()

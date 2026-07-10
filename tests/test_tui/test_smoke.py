@@ -69,8 +69,11 @@ async def test_every_screen_mounts() -> None:
     app = AtlasApp(example_config(), demo=True)
     async with app.run_test() as pilot:
         await pilot.pause()
+        from atlas.tui.screens.apps import AppsScreen
+
         for key, screen_type in [
             ("2", IncidentsScreen),
+            ("3", AppsScreen),
             ("6", CostScreen),
             ("7", SecurityScreen),
             ("8", ReportsScreen),
