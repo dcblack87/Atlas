@@ -98,6 +98,19 @@ async def seed_demo(db: Database) -> None:
                 attrs={"port": 5001 + SITES.index(site), "container": f"sitefarm-{site}"},
             )
         )
+        await metrics.write(
+            [
+                Sample("http.up", 1.0, f"site:sitefarm/{site}"),
+                Sample("http.response_ms", round(rng.uniform(40, 240), 1), f"site:sitefarm/{site}"),
+            ]
+        )
+    for app_entity in ("app:exampleapp", "app:shopfront"):
+        await metrics.write(
+            [
+                Sample("http.up", 1.0, app_entity),
+                Sample("http.response_ms", round(rng.uniform(60, 180), 1), app_entity),
+            ]
+        )
 
     # 24h of host history at 5-minute resolution, with a gentle daily curve
     samples: list[tuple[int, list[Sample]]] = []
