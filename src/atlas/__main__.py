@@ -52,12 +52,38 @@ def _cmd_run(*, headless: bool, demo: bool) -> int:
             print(f"atlas: {e}", file=sys.stderr)
             return 1
     if headless:
-        print("`atlas run --headless` arrives with the scheduler (M1).", file=sys.stderr)
-        return 2
+        if config is None:
+            print("atlas: --headless needs a config (demo is TUI-only)", file=sys.stderr)
+            return 1
+        return _run_headless(config)
 
     from atlas.app import AtlasApp
 
     AtlasApp(config, demo=demo).run()
+    return 0
+
+
+def _run_headless(config) -> int:
+    """Collectors + engine + alerts with no TUI — for testing and servers."""
+    import asyncio
+    import logging
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+
+    async def _main() -> None:
+        from atlas.runtime import Runtime
+
+        runtime = await Runtime.start(config)
+        print("atlas: headless mode — Ctrl-C to stop")
+        try:
+            await asyncio.Event().wait()
+        finally:
+            await runtime.stop()
+
+    import contextlib
+
+    with contextlib.suppress(KeyboardInterrupt):
+        asyncio.run(_main())
     return 0
 
 

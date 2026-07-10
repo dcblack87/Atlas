@@ -52,7 +52,10 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "ASYNC"]
-ignore = ["SIM108"]  # ternaries are not always clearer
+ignore = [
+    "SIM108",   # ternaries are not always clearer
+    "ASYNC109", # `timeout` params on Transport are a deliberate API contract
+]
 
 [tool.pyright]
 include = ["src"]

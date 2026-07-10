@@ -1,0 +1,4 @@
+ballcourt-backend	3.42%	412.3MiB / 15.24GiB	2.64%
+ballcourt-frontend	0.11%	98.7MiB / 15.24GiB	0.63%
+ballcourt-postgres	0.03%	62MiB / 15.24GiB	0.40%
+ballcourt-redis	0.20%	9.5MiB / 15.24GiB	0.06%
