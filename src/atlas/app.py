@@ -17,8 +17,10 @@ from atlas.config import Config
 from atlas.model import PROFILE_ORDER, PROFILES, DisplayProfile
 from atlas.runtime import Runtime
 from atlas.tui.screens.dashboard import DashboardScreen
+from atlas.tui.screens.deploy import DeployScreen
 from atlas.tui.screens.host import HostScreen
 from atlas.tui.screens.incidents import IncidentsScreen
+from atlas.tui.screens.logs import LogsScreen
 
 _THEMES_DIR = Path(__file__).parent / "tui" / "themes"
 
@@ -36,7 +38,9 @@ class AtlasApp(App[None]):
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("1", "goto('dashboard')", "Dashboard"),
         Binding("2", "goto('incidents')", "Incidents"),
+        Binding("4", "goto('deploy')", "Deploy"),
         Binding("h", "goto('hosts')", "Hosts"),
+        Binding("l", "goto('logs')", "Logs"),
         Binding("f2", "cycle_profile", "Display"),
         Binding("question_mark", "help", "Help", key_display="?"),
         Binding("q", "quit", "Quit"),
@@ -114,8 +118,19 @@ class AtlasApp(App[None]):
             case "incidents":
                 if not isinstance(self.screen, IncidentsScreen):
                     self.push_screen(IncidentsScreen())
+            case "deploy":
+                if self.demo:
+                    self.notify("deploys are disabled in demo mode", timeout=3)
+                elif not isinstance(self.screen, DeployScreen):
+                    self.push_screen(DeployScreen())
+            case "logs":
+                if not isinstance(self.screen, LogsScreen):
+                    self.push_screen(LogsScreen())
             case _:
                 self.notify(f"{target} — coming soon", severity="warning", timeout=2)
 
     def action_help(self) -> None:
-        self.notify("1 Dashboard · 2 Incidents · h Hosts · F2 display profile · q quit", timeout=4)
+        self.notify(
+            "1 Dashboard · 2 Incidents · 4 Deploy · h Hosts · l Logs · F2 display profile · q quit",
+            timeout=4,
+        )

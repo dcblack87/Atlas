@@ -15,6 +15,7 @@ from pathlib import Path
 
 from atlas.bus import Bus
 from atlas.config import Config
+from atlas.deploy.orchestrator import DeployOrchestrator
 from atlas.engine.incidents import SWEEP_INTERVAL_S, IncidentManager
 from atlas.engine.scheduler import Scheduler
 from atlas.notify.telegram import TelegramNotifier
@@ -38,6 +39,7 @@ class Runtime:
     incidents: IncidentManager
     scheduler: Scheduler | None = None
     notifier: TelegramNotifier | None = None
+    deployer: DeployOrchestrator | None = None
     _tasks: list[asyncio.Task] = field(default_factory=list)
 
     @classmethod
@@ -51,7 +53,10 @@ class Runtime:
         notifier.attach()
         scheduler = Scheduler(config, db, bus)
         await scheduler.start()
-        runtime = cls(config, db, bus, Inventory(db), Metrics(db), incidents, scheduler, notifier)
+        deployer = DeployOrchestrator(config, db, bus, scheduler.transport_for, incidents)
+        runtime = cls(
+            config, db, bus, Inventory(db), Metrics(db), incidents, scheduler, notifier, deployer
+        )
         runtime._tasks.append(asyncio.create_task(runtime._housekeeping(), name="housekeeping"))
         return runtime
 
