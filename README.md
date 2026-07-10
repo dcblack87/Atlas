@@ -36,7 +36,7 @@ uv run atlas check
 uv run atlas run
 ```
 
-For an always-on installation, run it in tmux on a server: `tmux new -s atlas scripts/atlas-tmux.sh` — then attach from anything that can SSH, including an e-ink tablet.
+For an always-on installation, run it in tmux on a server and attach from anything on your tailnet — including an e-ink tablet. See [docs/eink-setup.md](docs/eink-setup.md) for the BOOX + Termius walkthrough.
 
 ## What's inside
 
