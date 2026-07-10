@@ -123,9 +123,7 @@ class AtlasApp(App[None]):
             case "dashboard":
                 # pop back to the dashboard — never past it (the bottom of the
                 # Textual stack is a blank default screen)
-                while (
-                    not isinstance(self.screen, DashboardScreen) and len(self.screen_stack) > 1
-                ):
+                while not isinstance(self.screen, DashboardScreen) and len(self.screen_stack) > 1:
                     self.pop_screen()
                 if not isinstance(self.screen, DashboardScreen):
                     self.push_screen(DashboardScreen())

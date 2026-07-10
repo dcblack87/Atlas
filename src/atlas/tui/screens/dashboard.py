@@ -38,8 +38,9 @@ class DashboardScreen(Screen):
         height: 9;
         margin: 0 1;
     }
-    DashboardScreen #hosts {
+    DashboardScreen #hosts, DashboardScreen #apps {
         margin: 1 1;
+        height: auto;
     }
     """
 
@@ -53,6 +54,7 @@ class DashboardScreen(Screen):
             yield StatTile("Apps", id="apps-count")
             yield StatTile("Open Incidents", id="incidents")
         yield Static("starting collectors…", id="hosts")
+        yield Static("", id="apps")
         yield Footer()
 
     @property
@@ -135,13 +137,48 @@ class DashboardScreen(Screen):
                 f"{spark}"
             )
         text = "\n".join(lines) if lines else "no hosts discovered yet"
-        hosts_widget = self.query_one("#hosts", Static)
-        if getattr(hosts_widget, "_atlas_last", None) != text:
-            hosts_widget._atlas_last = text  # type: ignore[attr-defined]
-            hosts_widget.update(text)
+        self._update_static("hosts", text)
+        await self._refresh_apps(rt, apps)
+
+    async def _refresh_apps(self, rt, apps: list[dict]) -> None:
+        """One row per app; multi-site apps expand to one row per site."""
+        lines = ["APPS"]
+        for app in apps:
+            name = app["key"].removeprefix("app:")
+            host = (app["parent"] or "").removeprefix("host:")
+            sites = await rt.inventory.entities(kind="site", parent=app["key"])
+            if sites:
+                lines.append(f"{GLYPH_OK} {name:<22} {host:<16} {len(sites)} sites")
+                for site in sites:
+                    site_name = site["key"].split("/")[-1]
+                    snap = await rt.metrics.latest_snapshot(site["key"])
+                    glyph, latency = _liveness(snap)
+                    lines.append(f"    {glyph} {site_name:<20} {latency}")
+            else:
+                snap = await rt.metrics.latest_snapshot(app["key"])
+                glyph, latency = _liveness(snap)
+                lines.append(f"{glyph} {name:<22} {host:<16} {latency}")
+        self._update_static("apps", "\n".join(lines) if len(lines) > 1 else "")
+
+    def _update_static(self, widget_id: str, text: str) -> None:
+        widget = self.query_one(f"#{widget_id}", Static)
+        if getattr(widget, "_atlas_last", None) != text:
+            widget._atlas_last = text  # type: ignore[attr-defined]
+            widget.update(text)
 
     def _set_tile(self, tile_id: str, value: str) -> None:
         self.query_one(f"#{tile_id}", StatTile).value = value
+
+
+def _liveness(snap: dict[str, float]) -> tuple[str, str]:
+    """(glyph, latency-label) from an entity's http samples."""
+    up = snap.get("http.up")
+    if up is None:
+        return GLYPH_OK, "—"
+    if up < 1:
+        return GLYPH_CRIT, "DOWN"
+    ms = snap.get("http.response_ms")
+    return GLYPH_OK, f"{ms:>4.0f}ms" if ms is not None else "up"
 
 
 def _fmt(value: float | None, spec: str) -> str:
