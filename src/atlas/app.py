@@ -121,8 +121,14 @@ class AtlasApp(App[None]):
     def action_goto(self, target: str) -> None:
         match target:
             case "dashboard":
-                while len(self.screen_stack) > 1:
+                # pop back to the dashboard — never past it (the bottom of the
+                # Textual stack is a blank default screen)
+                while (
+                    not isinstance(self.screen, DashboardScreen) and len(self.screen_stack) > 1
+                ):
                     self.pop_screen()
+                if not isinstance(self.screen, DashboardScreen):
+                    self.push_screen(DashboardScreen())
             case "hosts":
                 if not isinstance(self.screen, HostScreen):
                     self.push_screen(HostScreen())
