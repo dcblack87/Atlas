@@ -111,6 +111,10 @@ class AtlasApp(App[None]):
         for name in PROFILE_ORDER:
             self.remove_class(f"-profile-{name}")
         self.add_class(f"-profile-{profile.name}")
+        # Switch Textual's active theme so every widget — sparklines, tables,
+        # bare Statics — gets correct contrast. e-ink/glance are light (white
+        # paper); standard is dark. Without this, text can render same-on-same.
+        self.theme = "textual-light" if profile.name in ("eink", "glance") else "textual-dark"
         for screen in self.screen_stack:
             handler = getattr(screen, "on_profile_changed", None)
             if handler is not None:

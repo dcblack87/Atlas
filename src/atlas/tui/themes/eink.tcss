@@ -1,23 +1,15 @@
 /* E-ink profile — BOOX and friends.
  *
- * Rules of the road:
- *  - black / white / one grey only; severity is carried by glyphs (● ▲ ✖),
- *    never by colour
- *  - heavy borders survive greyscale better than tints
- *  - no animation, no blink, nothing that invites a repaint
+ * The app switches to Textual's light theme for this profile, so colours
+ * come from theme variables ($surface, $text …) and always contrast. This
+ * file only adds the e-ink-specific character: heavy borders that survive
+ * greyscale, severity by glyph not colour, and no animation.
  */
-
-App.-profile-eink Screen {
-    background: white;
-    color: black;
-}
 
 App.-profile-eink .tile {
     border: heavy black;
     padding: 0 1;
     height: 100%;
-    background: white;
-    color: black;
 }
 
 App.-profile-eink .tile-title {
@@ -30,11 +22,7 @@ App.-profile-eink .tile-value {
     color: black;
 }
 
+/* severity carried by weight, not hue — survives greyscale */
 App.-profile-eink .status-ok { color: black; }
 App.-profile-eink .status-warn { color: black; text-style: bold; }
 App.-profile-eink .status-crit { color: black; text-style: bold reverse; }
-
-App.-profile-eink Footer {
-    background: white;
-    color: black;
-}
