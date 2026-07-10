@@ -28,12 +28,12 @@ if [ -n "${TMUX:-}" ]; then
     tmux set -g status off 2>/dev/null || true
 fi
 
+# Always-on: respawn no matter how Atlas exits, including a clean `q`. This
+# is a server desk-console — you leave it by DETACHING (Ctrl-b then d), not
+# by quitting, so a stray `q` on a tablet must never take the console down.
+# To actually stop it: tmux kill-session -t atlas.
 while true; do
-    uv run atlas run
-    status=$?
-    if [ "$status" -eq 0 ]; then
-        break  # clean quit (q) — don't respawn
-    fi
-    echo "atlas exited with status $status — restarting in 5s (Ctrl-C to stop)"
-    sleep 5
+    uv run atlas run || true
+    echo "atlas exited — restarting in 3s (tmux kill-session -t atlas to stop)"
+    sleep 3
 done
