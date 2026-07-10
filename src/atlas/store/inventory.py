@@ -2,7 +2,7 @@
 
 Discovery is the source of truth. Each sync upserts what a collector saw and
 returns what appeared/disappeared so the timeline can record drift — a new
-DirectoryLab site showing up is an event worth remembering.
+tenant site showing up is an event worth remembering.
 """
 
 from __future__ import annotations

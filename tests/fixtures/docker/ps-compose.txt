@@ -1,13 +1,13 @@
-ballcourt-backend	running	Up 2 days (healthy)	firelens-backend:latest	127.0.0.1:8000->8000/tcp
-ballcourt-frontend	running	Up 2 days (healthy)	firelens-frontend:latest	127.0.0.1:3000->3000/tcp
-ballcourt-postgres	running	Up 9 days (healthy)	postgres:16-alpine	127.0.0.1:5432->5432/tcp
-ballcourt-redis	running	Up 9 days (healthy)	redis:7-alpine	127.0.0.1:6379->6379/tcp
-ballcourt-celery-worker	running	Up 2 days (healthy)	firelens-backend:latest
-ballcourt-celery-beat	restarting	Restarting (1) 20 seconds ago	firelens-backend:latest
+exampleapp-backend	running	Up 2 days (healthy)	exampleapp-backend:latest	127.0.0.1:8000->8000/tcp
+exampleapp-frontend	running	Up 2 days (healthy)	exampleapp-frontend:latest	127.0.0.1:3000->3000/tcp
+exampleapp-postgres	running	Up 9 days (healthy)	postgres:16-alpine	127.0.0.1:5432->5432/tcp
+exampleapp-redis	running	Up 9 days (healthy)	redis:7-alpine	127.0.0.1:6379->6379/tcp
+exampleapp-celery-worker	running	Up 2 days (healthy)	exampleapp-backend:latest
+exampleapp-celery-beat	restarting	Restarting (1) 20 seconds ago	exampleapp-backend:latest
 ===RESTARTS===
-/ballcourt-backend	0	healthy
-/ballcourt-frontend	0	healthy
-/ballcourt-postgres	0	healthy
-/ballcourt-redis	0	healthy
-/ballcourt-celery-worker	2	healthy
-/ballcourt-celery-beat	17
+/exampleapp-backend	0	healthy
+/exampleapp-frontend	0	healthy
+/exampleapp-postgres	0	healthy
+/exampleapp-redis	0	healthy
+/exampleapp-celery-worker	2	healthy
+/exampleapp-celery-beat	17

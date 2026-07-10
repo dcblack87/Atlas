@@ -38,13 +38,13 @@ class TestDockerParser:
     def test_compose_stack(self) -> None:
         obs = parse_docker_ps(_fixture("docker/ps-compose.txt"), "web-1")
         keys = {e.key for e in obs.entities}
-        assert "container:web-1/ballcourt-backend" in keys
+        assert "container:web-1/exampleapp-backend" in keys
         assert len(keys) == 6
 
         metrics = {(s.metric, s.entity): s.value for s in obs.samples}
-        assert metrics[("container.up", "container:web-1/ballcourt-backend")] == 1.0
-        assert metrics[("container.up", "container:web-1/ballcourt-celery-beat")] == 0.0
-        assert metrics[("container.restarts", "container:web-1/ballcourt-celery-beat")] == 17
+        assert metrics[("container.up", "container:web-1/exampleapp-backend")] == 1.0
+        assert metrics[("container.up", "container:web-1/exampleapp-celery-beat")] == 0.0
+        assert metrics[("container.restarts", "container:web-1/exampleapp-celery-beat")] == 17
         assert metrics[("docker.running", "host:web-1")] == 5.0
 
         # the restarting container is a critical finding
@@ -56,10 +56,10 @@ class TestDockerParser:
     def test_stats(self) -> None:
         samples = parse_docker_stats(_fixture("docker/stats.txt"), "web-1")
         by_key = {(s.metric, s.entity): s.value for s in samples}
-        assert by_key[("container.cpu_pct", "container:web-1/ballcourt-backend")] == pytest.approx(
+        assert by_key[("container.cpu_pct", "container:web-1/exampleapp-backend")] == pytest.approx(
             3.42
         )
-        mem = by_key[("container.mem_bytes", "container:web-1/ballcourt-backend")]
+        mem = by_key[("container.mem_bytes", "container:web-1/exampleapp-backend")]
         assert mem == pytest.approx(412.3 * 2**20, rel=0.01)
 
 

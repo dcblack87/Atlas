@@ -130,7 +130,7 @@ def _parse_health_json(body: str) -> dict | None:
     except (json.JSONDecodeError, ValueError):
         return None
     if isinstance(data, dict):
-        # BookingMachine wraps its payload in {"data": {...}}.
+        # Some apps wrap their health payload in {"data": {...}}.
         inner = data.get("data")
         return inner if isinstance(inner, dict) else data
     return None

@@ -1,7 +1,7 @@
 """Discovery — the zero-config magic.
 
 Reads each app's shape from the machine itself: git shas, compose services,
-per-site ports. New DirectoryLab-style sites appear in inventory within one
+per-site ports. New sites in multi-tenant apps appear in inventory within one
 cycle with no config change; the diff lands on the timeline.
 """
 
@@ -70,7 +70,7 @@ class DiscoveryCollector(Collector):
     async def _discover_sites(
         self, transport: Transport, app_name: str, app: AppConfig
     ) -> list[Entity]:
-        """Read sites/<name>/.port files — DirectoryLab's source of truth."""
+        """Read sites/<name>/.port files — the multi-site convention's source of truth."""
         result = await transport.run(
             [
                 "sh",
