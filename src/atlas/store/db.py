@@ -41,7 +41,15 @@ class Database:
         self._write = self._read = None
 
     async def _connect(self) -> aiosqlite.Connection:
-        conn = await aiosqlite.connect(self.path)
+        pending = aiosqlite.connect(self.path)
+        # aiosqlite runs each connection on a non-daemon worker thread; a
+        # handle leaked mid-cancellation would block interpreter shutdown
+        # forever. Daemonise before the thread starts (close() remains the
+        # happy path).
+        worker = getattr(pending, "_thread", None)
+        if worker is not None:
+            worker.daemon = True
+        conn = await pending
         conn.row_factory = aiosqlite.Row
         await conn.execute("PRAGMA journal_mode=WAL")
         await conn.execute("PRAGMA synchronous=NORMAL")

@@ -16,7 +16,9 @@ from textual.screen import Screen
 from textual.timer import Timer
 from textual.widgets import Footer, Static
 
+from atlas.engine.health import health_scores
 from atlas.model import DisplayProfile
+from atlas.tui.widgets.sparkline import bucketize, sparkline
 from atlas.tui.widgets.tiles import GLYPH_CRIT, GLYPH_OK, GLYPH_WARN, StatTile
 
 if TYPE_CHECKING:
@@ -85,8 +87,18 @@ class DashboardScreen(Screen):
         self._set_tile("hosts-count", str(len(hosts)))
         apps_label = str(len(apps)) if not sites else f"{len(apps)} (+{len(sites)} sites)"
         self._set_tile("apps-count", apps_label)
-        self._set_tile("health", "—")  # scored in M2
-        self._set_tile("incidents", "0")
+
+        scores = await health_scores(rt.incidents.store)
+        fleet = scores["fleet"]
+        health_tile = self.query_one("#health", StatTile)
+        health_tile.value = f"{fleet}/100"
+        health_tile.status = "ok" if fleet >= 90 else "warn" if fleet >= 60 else "crit"
+
+        open_incidents = await rt.incidents.store.open_incidents()
+        crit = sum(1 for i in open_incidents if i["severity"] == "critical")
+        incidents_tile = self.query_one("#incidents", StatTile)
+        incidents_tile.value = "0" if not open_incidents else f"{len(open_incidents)} ({crit} crit)"
+        incidents_tile.status = "crit" if crit else "warn" if open_incidents else "ok"
 
         lines = []
         for host in hosts:
@@ -105,12 +117,22 @@ class DashboardScreen(Screen):
                 glyph = GLYPH_CRIT
             elif (disk is not None and disk >= 80) or (mem is not None and mem >= 90):
                 glyph = GLYPH_WARN
+            spark = ""
+            if self.atlas.profile.show_sparklines:
+                points = await rt.metrics.recent(host["key"], "load.1m", since_s=6 * 3600)
+                buckets = bucketize(
+                    [(p.ts, p.value) for p in points],
+                    self.atlas.profile.sparkline_bucket,
+                    width=16,
+                )
+                spark = "  " + sparkline(buckets, width=16)
             lines.append(
                 f"{glyph} {name:<18}"
                 f" load {_fmt(load, '{:>5.2f}')}"
                 f"  mem {_fmt(mem, '{:>3.0f}%')}"
                 f"  disk {_fmt(disk, '{:>3.0f}%')}"
                 f"  containers {_fmt(running, '{:>2.0f}')}"
+                f"{spark}"
             )
         text = "\n".join(lines) if lines else "no hosts discovered yet"
         hosts_widget = self.query_one("#hosts", Static)
