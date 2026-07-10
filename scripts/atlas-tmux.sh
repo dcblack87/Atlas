@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Run Atlas inside tmux with a respawn loop — a crash self-heals in 5s.
 #
-#   tmux new -s atlas /opt/atlas/scripts/atlas-tmux.sh
+# Launch (robust to a missing +x bit after rsync/scp):
+#   tmux new -d -s atlas 'cd /opt/atlas && exec bash scripts/atlas-tmux.sh'
 #
 # Attach from anywhere on the tailnet:
 #   ssh root@<atlas-host> -t 'tmux attach -t atlas'
