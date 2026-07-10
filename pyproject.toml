@@ -55,6 +55,7 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "ASYNC"]
 ignore = [
     "SIM108",   # ternaries are not always clearer
     "ASYNC109", # `timeout` params on Transport are a deliberate API contract
+    "ASYNC240", # sub-ms local Path IO; not worth a trio/anyio dependency
 ]
 
 [tool.pyright]

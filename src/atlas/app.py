@@ -16,6 +16,8 @@ from textual.binding import Binding, BindingType
 from atlas.config import Config
 from atlas.model import PROFILE_ORDER, PROFILES, DisplayProfile
 from atlas.runtime import Runtime
+from atlas.tui.screens.chat import ChatScreen
+from atlas.tui.screens.cost import CostScreen
 from atlas.tui.screens.dashboard import DashboardScreen
 from atlas.tui.screens.deploy import DeployScreen
 from atlas.tui.screens.host import HostScreen
@@ -39,8 +41,11 @@ class AtlasApp(App[None]):
         Binding("1", "goto('dashboard')", "Dashboard"),
         Binding("2", "goto('incidents')", "Incidents"),
         Binding("4", "goto('deploy')", "Deploy"),
+        Binding("5", "goto('chat')", "Chat"),
+        Binding("6", "goto('cost')", "Cost"),
         Binding("h", "goto('hosts')", "Hosts"),
         Binding("l", "goto('logs')", "Logs"),
+        Binding("b", "bundle", "Bundle"),
         Binding("f2", "cycle_profile", "Display"),
         Binding("question_mark", "help", "Help", key_display="?"),
         Binding("q", "quit", "Quit"),
@@ -126,11 +131,31 @@ class AtlasApp(App[None]):
             case "logs":
                 if not isinstance(self.screen, LogsScreen):
                     self.push_screen(LogsScreen())
+            case "chat":
+                if not isinstance(self.screen, ChatScreen):
+                    self.push_screen(ChatScreen())
+            case "cost":
+                if not isinstance(self.screen, CostScreen):
+                    self.push_screen(CostScreen())
             case _:
                 self.notify(f"{target} — coming soon", severity="warning", timeout=2)
 
+    def action_bundle(self) -> None:
+        self.run_worker(self._write_bundle(), exclusive=True, group="bundle")
+
+    async def _write_bundle(self) -> None:
+        if self.runtime is None:
+            return
+        from atlas.ai.bundles import write_bundle
+        from atlas.ai.context import ContextBuilder
+
+        context = self.runtime.context or ContextBuilder(self.runtime.db)
+        path = await write_bundle(context)
+        self.notify(f"context bundle written: {path}", timeout=6)
+
     def action_help(self) -> None:
         self.notify(
-            "1 Dashboard · 2 Incidents · 4 Deploy · h Hosts · l Logs · F2 display profile · q quit",
+            "1 Dashboard · 2 Incidents · 4 Deploy · 5 Chat · 6 Cost · h Hosts · "
+            "l Logs · b Bundle · F2 display profile · q quit",
             timeout=4,
         )

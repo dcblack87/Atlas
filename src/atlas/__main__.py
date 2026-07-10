@@ -36,8 +36,7 @@ def main(argv: list[str] | None = None) -> int:
         case "check":
             return _cmd_check()
         case "bundle":
-            print("`atlas bundle` arrives with the AI layer (M4).", file=sys.stderr)
-            return 2
+            return _cmd_bundle(app=args.app)
         case _:
             parser.print_help()
             return 0
@@ -85,6 +84,36 @@ def _run_headless(config) -> int:
     with contextlib.suppress(KeyboardInterrupt):
         asyncio.run(_main())
     return 0
+
+
+def _cmd_bundle(app: str | None) -> int:
+    """Write a Claude Code context bundle from the live database."""
+    import asyncio
+
+    try:
+        config = load_config()
+    except ConfigError as e:
+        print(f"atlas: {e}", file=sys.stderr)
+        return 1
+
+    async def _write() -> int:
+        from atlas.ai.bundles import write_bundle
+        from atlas.ai.context import ContextBuilder
+        from atlas.store.db import Database
+
+        if not config.atlas.db_path.exists():
+            print("atlas: no database yet — run `atlas run` first", file=sys.stderr)
+            return 1
+        db = Database(config.atlas.db_path)
+        await db.open()
+        try:
+            path = await write_bundle(ContextBuilder(db), app)
+        finally:
+            await db.close()
+        print(f"bundle written: {path}")
+        return 0
+
+    return asyncio.run(_write())
 
 
 def _cmd_check() -> int:

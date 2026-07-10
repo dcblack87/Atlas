@@ -96,7 +96,7 @@ async def test_wrong_phrase_refused(env) -> None:
 
 
 async def test_deploy_streams_verifies_and_audits(env) -> None:
-    orchestrator, transport, db, _ = env
+    orchestrator, _transport, db, _ = env
     lines = [line async for line in orchestrator.deploy("shopfront", "shopfront")]
     assert "pulling…" in lines
     assert any("VERIFICATION PASSED" in line for line in lines)
@@ -114,7 +114,7 @@ async def test_deploy_streams_verifies_and_audits(env) -> None:
 
 
 async def test_failed_verification_opens_incident(env) -> None:
-    orchestrator, transport, db, incidents = env
+    orchestrator, transport, _db, incidents = env
     transport.run_responses["curl"] = "502"
     lines = [line async for line in orchestrator.deploy("shopfront", "shopfront")]
     assert any("VERIFICATION FAILED" in line for line in lines)
