@@ -51,6 +51,8 @@ class AtlasApp(App[None]):
         Binding("l", "goto('logs')", "Logs"),
         Binding("b", "bundle", "Bundle"),
         Binding("f2", "cycle_profile", "Display"),
+        # e-ink tablets and phone keyboards rarely have function keys
+        Binding("p", "cycle_profile", "Display", show=False),
         Binding("question_mark", "help", "Help", key_display="?"),
         Binding("q", "quit", "Quit"),
     ]
