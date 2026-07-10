@@ -106,8 +106,14 @@ class IncidentManager:
 
     # ── lifecycle ────────────────────────────────────────────────────
 
-    async def _raise(self, finding: Finding) -> None:
-        if finding.severity == Severity.INFO or self._is_suppressed(finding.entity):
+    async def raise_finding(self, finding: Finding, *, ignore_suppression: bool = False) -> None:
+        """Public entry for pre-judged findings (deploy verification failures)."""
+        await self._raise(finding, ignore_suppression=ignore_suppression)
+
+    async def _raise(self, finding: Finding, *, ignore_suppression: bool = False) -> None:
+        if finding.severity == Severity.INFO:
+            return
+        if not ignore_suppression and self._is_suppressed(finding.entity):
             return
         existing = await self._store.find_open(finding.rule_id, finding.entity)
         if existing is None:
