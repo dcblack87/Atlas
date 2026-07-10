@@ -19,7 +19,16 @@ class TextModal(ModalScreen[None]):
     }
     """
 
-    BINDINGS: ClassVar = [("escape", "dismiss", "Close"), ("q", "dismiss", "Close")]
+    BINDINGS: ClassVar = [
+        ("escape", "dismiss", "Close"),
+        ("q", "dismiss", "Close"),
+        ("c", "copy_body", "Copy"),
+    ]
+
+    def action_copy_body(self) -> None:
+        from atlas.tui.clipboard import copy_text
+
+        copy_text(self, self._body, self._title)
 
     def __init__(self, title: str, body: str) -> None:
         super().__init__()

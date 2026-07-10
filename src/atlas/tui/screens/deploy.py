@@ -33,7 +33,13 @@ class DeployScreen(Screen):
         ("escape", "app.pop_screen", "Back"),
         ("d", "deploy", "Deploy"),
         ("r", "rollback", "Rollback"),
+        ("c", "copy_output", "Copy"),
     ]
+
+    def action_copy_output(self) -> None:
+        from atlas.tui.clipboard import copy_text
+
+        copy_text(self, self.query_one("#stream", StreamLog).text, "deploy output")
 
     def __init__(self) -> None:
         super().__init__()

@@ -9,6 +9,12 @@ set -u
 
 cd "$(dirname "$0")/.."
 
+# Let Atlas's copy keys (OSC 52) pass through tmux to the local clipboard —
+# this is what makes `c` work from an SSH session on a tablet.
+if [ -n "${TMUX:-}" ]; then
+    tmux set -g set-clipboard on 2>/dev/null || true
+fi
+
 while true; do
     uv run atlas run
     status=$?

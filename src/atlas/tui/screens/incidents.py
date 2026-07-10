@@ -34,7 +34,30 @@ class IncidentsScreen(Screen):
         ("escape", "app.pop_screen", "Back"),
         ("a", "acknowledge", "Ack"),
         ("e", "explain", "Explain (AI)"),
+        ("c", "copy_incident", "Copy"),
     ]
+
+    def action_copy_incident(self) -> None:
+        self.run_worker(self._copy_incident(), exclusive=True, group="copy")
+
+    async def _copy_incident(self) -> None:
+        from atlas.tui.clipboard import copy_text
+
+        rt = self.atlas.runtime
+        incident_id = self._selected_incident()
+        if rt is None or incident_id is None:
+            return
+        incident = await rt.incidents.store.get(incident_id)
+        if incident is None:
+            return
+        opened = datetime.fromtimestamp(incident["opened_at"]).strftime("%Y-%m-%d %H:%M")
+        text = (
+            f"[{incident['severity']}] {incident['title']}\n"
+            f"entity: {incident['entity_key']}  rule: {incident['rule_id']}\n"
+            f"opened: {opened}  status: {incident['status']}\n"
+            f"detail: {incident['detail']}"
+        )
+        copy_text(self, text, f"incident #{incident_id}")
 
     def __init__(self) -> None:
         super().__init__()
