@@ -107,6 +107,7 @@ class Scheduler:
                 await self._store(collector, host, obs)
                 if strikes >= STRIKES_BEFORE_REPORT or self._host_down.get(host.name):
                     self._host_down[host.name] = False
+                    await self._report_host_up(host)
                     await self.bus.publish(CollectorStatus(host.name, collector.name, ok=True))
                 strikes = 0
                 sleep_s = collector.interval * random.uniform(0.9, 1.1)
@@ -145,7 +146,9 @@ class Scheduler:
 
     async def _report_host_down(self, host: HostConfig, reason: str) -> None:
         entity = f"host:{host.name}"
-        await self.metrics.write([Sample("host.up", 0.0, entity)])
+        samples = [Sample("host.up", 0.0, entity)]
+        await self.metrics.write(samples)
+        await self.bus.publish(SamplesEvent(host.name, "transport", samples))
         await self.bus.publish(
             FindingsEvent(
                 host.name,
@@ -160,3 +163,11 @@ class Scheduler:
                 ],
             )
         )
+
+    async def _report_host_up(self, host: HostConfig) -> None:
+        """Recovery: mark the host up again so the dashboard and the
+        host_down incident don't stay stuck after connectivity returns."""
+        entity = f"host:{host.name}"
+        samples = [Sample("host.up", 1.0, entity)]
+        await self.metrics.write(samples)
+        await self.bus.publish(SamplesEvent(host.name, "transport", samples))

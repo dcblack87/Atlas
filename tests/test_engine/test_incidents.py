@@ -89,3 +89,28 @@ async def test_health_scores(env) -> None:
     scores = await health_scores(manager.store)
     assert scores["container:a/web"] == 60
     assert scores["fleet"] < 100
+
+
+async def test_host_down_recovers_on_host_up(env) -> None:
+    """host.up=1 must clear a host_down incident and un-stick the dashboard."""
+    db, bus, manager, events = env
+    metrics = Metrics(db)
+
+    # host goes down
+    down = [Sample("host.up", 0.0, "host:a")]
+    await metrics.write(down)
+    await bus.publish(
+        FindingsEvent(
+            "a",
+            "transport",
+            [Finding("host_down", "host:a", Severity.CRITICAL, "a unreachable")],
+        )
+    )
+    assert len(await manager.store.open_incidents()) == 1
+
+    # host recovers
+    up = [Sample("host.up", 1.0, "host:a")]
+    await metrics.write(up)
+    await bus.publish(SamplesEvent("a", "transport", up))
+    assert await manager.store.open_incidents() == []
+    assert "resolved" in [e.kind for e in events]

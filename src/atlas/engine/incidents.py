@@ -62,6 +62,14 @@ class IncidentManager:
     # ── sources ──────────────────────────────────────────────────────
 
     async def _on_samples(self, event: SamplesEvent) -> None:
+        # A host reporting up again clears its (transport-level) host_down —
+        # host_down is a collector finding, not a metric rule, so resolve it
+        # here the moment connectivity returns rather than waiting on the sweep.
+        for sample in event.samples:
+            if sample.metric == "host.up" and sample.value >= 1:
+                await self._clear("host_down", sample.entity)
+                self._last_asserted.pop(("host_down", sample.entity), None)
+
         touched = {(s.entity, s.metric) for s in event.samples}
         for rule in METRIC_RULES:
             for entity, metric in touched:
