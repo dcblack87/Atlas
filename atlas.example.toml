@@ -1,0 +1,110 @@
+# Atlas configuration — copy to atlas.toml (gitignored) and fill in your fleet.
+#
+#   cp atlas.example.toml atlas.toml
+#   $EDITOR atlas.toml
+#   uv run atlas check      # validates config and connectivity
+#   uv run atlas run
+#
+# Atlas reads $ATLAS_CONFIG if set, otherwise ./atlas.toml.
+# All addresses below are fake (TEST-NET / Tailscale-style placeholders).
+
+[atlas]
+# Where Atlas keeps its SQLite state (inventory, metrics, incidents, audit).
+db_path = "atlas.db"
+# Display profile at startup: "standard" | "eink" | "glance". Cycle live with F2.
+display_profile = "standard"
+
+[ssh]
+# Dedicated key for Atlas — generate one, don't reuse your personal key:
+#   ssh-keygen -t ed25519 -f ~/.ssh/atlas_ed25519 -N "" -C atlas
+key_file = "~/.ssh/atlas_ed25519"
+user = "root"
+connect_timeout = 10
+keepalive = 30
+
+# ── Fleet inventory ──────────────────────────────────────────────────
+# One [[hosts]] block per server. address = "local" means "this machine"
+# (Atlas collects via subprocess instead of SSH — use it for the host
+# Atlas itself runs on).
+
+[[hosts]]
+name = "web-1"
+address = "local"
+apps = ["exampleapp"]
+
+[[hosts]]
+name = "web-2"
+address = "100.64.0.10"          # Tailscale IP or any SSH-reachable address
+apps = ["shopfront"]
+
+[[hosts]]
+name = "sites-1"
+address = "100.64.0.11"
+apps = ["sitefarm"]
+
+# ── Applications ─────────────────────────────────────────────────────
+# kind:
+#   "compose"          — docker compose stack in `path`
+#   "single-container" — one container built/run by a deploy script
+#   "multi-site"       — one image, N per-site containers (ports in sites/<name>/.port)
+
+[apps.exampleapp]
+kind = "compose"
+path = "/opt/exampleapp"
+health_url = "http://127.0.0.1:8000/api/health"
+deploy_command = "./scripts/deploy.sh update"
+github_repo = "you/exampleapp"   # optional; enables CI status + deploy drift
+
+[apps.shopfront]
+kind = "single-container"
+path = "/opt/shopfront"
+container = "shopfront"
+liveness_url = "http://127.0.0.1:3000/"
+deploy_command = "./scripts/deploy.sh update"
+
+[apps.sitefarm]
+kind = "multi-site"
+path = "/opt/sitefarm"
+sites_dir = "/opt/sitefarm/sites"
+container_prefix = "sitefarm-"
+deploy_command = "./scripts/deploy.sh update"
+
+# ── AI ───────────────────────────────────────────────────────────────
+[ai]
+enabled = true
+model = "claude-opus-4-8"
+# Hard daily ceiling. Atlas refuses API calls past this — checked BEFORE each call.
+daily_budget_usd = 2.00
+# Sub-budget for anomaly-triggered (automatic) insights.
+auto_insight_budget_usd = 0.75
+max_auto_insights_per_day = 10
+# API key comes from $ANTHROPIC_API_KEY (preferred) or `api_key` here.
+
+# ── Notifications ────────────────────────────────────────────────────
+[telegram]
+enabled = false
+# bot_token = "..."
+# chat_id = "..."
+
+# ── Costs (optional) ─────────────────────────────────────────────────
+# Read-only Hetzner Cloud API tokens, one per project. Atlas only ever GETs.
+[hcloud]
+enabled = false
+# tokens = { project-a = "...", project-b = "..." }
+
+# ── GitHub (optional) ────────────────────────────────────────────────
+[github]
+enabled = false
+# token = "..."                   # read-only fine-grained PAT
+
+# ── Deploys ──────────────────────────────────────────────────────────
+[deploy]
+enabled = true
+timeout_seconds = 900
+# Remediation templates that may be offered as one-key fixes. Anything not
+# listed here can never be executed by Atlas. {container} etc. are filled
+# from inventory, never from free text.
+remediations = [
+    "docker restart {container}",
+    "docker builder prune -f",
+]

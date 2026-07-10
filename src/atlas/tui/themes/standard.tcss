@@ -1,0 +1,25 @@
+/* Standard profile — for LCD terminals. Colour allowed, 1s refresh. */
+
+App.-profile-standard Screen {
+    background: $surface;
+}
+
+App.-profile-standard .tile {
+    border: round $primary 60%;
+    padding: 0 1;
+    height: 100%;
+}
+
+App.-profile-standard .tile-title {
+    color: $text-muted;
+    text-style: bold;
+}
+
+App.-profile-standard .tile-value {
+    text-style: bold;
+    color: $text;
+}
+
+App.-profile-standard .status-ok { color: $success; }
+App.-profile-standard .status-warn { color: $warning; }
+App.-profile-standard .status-crit { color: $error; }

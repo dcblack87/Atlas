@@ -1,0 +1,28 @@
+# Real inventory & secrets — NEVER commit. Use atlas.example.toml as the template.
+atlas.toml
+*.env
+.env*
+
+# Runtime state
+*.db
+*.db-wal
+*.db-shm
+bundles/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.pyright/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

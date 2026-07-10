@@ -1,0 +1,31 @@
+/* Glance profile — the across-the-room view.
+ * A handful of huge tiles; readable from 2–3 metres on a desk-parked BOOX.
+ */
+
+App.-profile-glance Screen {
+    background: white;
+    color: black;
+}
+
+App.-profile-glance .tile {
+    border: heavy black;
+    padding: 1 2;
+    height: 100%;
+    background: white;
+    color: black;
+    content-align: center middle;
+}
+
+App.-profile-glance .tile-title {
+    color: black;
+    text-style: bold;
+    text-align: center;
+}
+
+App.-profile-glance .tile-value {
+    text-style: bold;
+    color: black;
+    text-align: center;
+}
+
+App.-profile-glance .status-crit { color: black; text-style: bold reverse; }

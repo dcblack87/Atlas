@@ -1,0 +1,67 @@
+[project]
+name = "atlas-ops"
+version = "0.1.0"
+description = "AI-native operations platform for self-hosted infrastructure — a terminal command centre for solo founders, designed for e-ink."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "David Black" }]
+requires-python = ">=3.12"
+keywords = ["devops", "monitoring", "tui", "textual", "e-ink", "self-hosted", "ai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Monitoring",
+]
+dependencies = [
+    "textual>=1.0",
+    "asyncssh>=2.20",
+    "aiosqlite>=0.21",
+    "anthropic>=0.40",
+    "httpx>=0.28",
+    "pydantic>=2.10",
+]
+
+[project.scripts]
+atlas = "atlas.__main__:main"
+
+[project.urls]
+Repository = "https://github.com/dcblack87/Atlas"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8",
+    "pyright>=1.1.390",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/atlas"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "ASYNC"]
+ignore = ["SIM108"]  # ternaries are not always clearer
+
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
