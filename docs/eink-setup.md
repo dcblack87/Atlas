@@ -1,4 +1,4 @@
-# Running Atlas on an e-ink tablet (BOOX + Termius)
+# Running Atlas on an e-ink tablet (reMarkable / BOOX / Supernote)
 
 Atlas runs 24/7 in a `tmux` session on your ops server; the tablet is a thin
 client that attaches to it. Nothing is installed on the tablet but Termius

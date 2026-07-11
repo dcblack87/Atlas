@@ -8,8 +8,6 @@ Atlas is a terminal operations centre that runs 24/7 in tmux on one of your own 
 
 ![Atlas dashboard (demo fleet)](docs/screenshots/dashboard.svg)
 
-*Everything above is `atlas run --demo` — a seeded fixture fleet. Screenshots in this repo never show real infrastructure.*
-
 ## Why
 
 Traditional observability stacks assume a team, a budget, and a wall of monitors. A solo founder running real products on a few VPSes needs something else entirely:
