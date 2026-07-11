@@ -145,9 +145,9 @@ class AppsScreen(Screen):
             if host:
                 cap = await site_capacity(rt.inventory, rt.metrics, entity, host)
                 if cap is not None and cap.known:
-                    verb = "more site fits" if cap.additional_sites == 1 else "more sites fit"
+                    noun = "site" if cap.additional_sites == 1 else "sites"
                     lines.append(
-                        f"\nCAPACITY  room for ~{cap.additional_sites} {verb} "
+                        f"\nCAPACITY  room for ~{cap.additional_sites} more {noun} "
                         f"({cap.bound_by}-bound)"
                     )
                     lines.append(
