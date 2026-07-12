@@ -1,0 +1,11 @@
+/etc/cron.d/marketing-agent:# Marketing Agent cron jobs — managed by scripts/setup-crons.sh. Do not edit by hand.
+/etc/cron.d/marketing-agent:# Independent of the user crontab so it never touches BookingMachine's schedule.
+/etc/cron.d/marketing-agent:SHELL=/bin/bash
+/etc/cron.d/marketing-agent:PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+/etc/cron.d/marketing-agent:
+/etc/cron.d/marketing-agent:# Scheduler tick — every minute; fires due jobs per DB cron_schedules.
+/etc/cron.d/marketing-agent:* * * * * root curl -sf -X POST -H "Authorization: Bearer 1111111111111111111111111111111111111111111111111111111111111111" http://127.0.0.1:3100/api/v1/cron/dispatch >> /var/log/marketing-agent-cron.log 2>&1
+/etc/cron.d/marketing-agent:# Nightly DB backup — daily at 02:30 UTC (fixed; not an API job)
+/etc/cron.d/marketing-agent:30 2 * * * root bash /opt/marketing-agent/scripts/backup-db.sh auto >> /var/log/marketing-agent-backup.log 2>&1
+/etc/cron.d/certbot:# /etc/cron.d/certbot: crontab entries for the certbot package
+/etc/cron.d/certbot:0 */12 * * * root test -x /usr/bin/certbot && perl -e 'sleep int(rand(43200))' && certbot -q renew

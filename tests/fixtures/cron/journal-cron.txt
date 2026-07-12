@@ -1,0 +1,6 @@
+1783998001.412331 quotelab-prod CRON[381201]: (root) CMD (/opt/bookingmachine/scripts/backup-db.sh auto >> /var/log/bookingmachine-backup.log 2>&1)
+1784008801.128812 quotelab-prod CRON[381900]: (root) CMD (curl -sf -X POST -H 'Authorization: Bearer 0000000000000000000000000000000000000000000000000000000000000000' http://127.0.0.1:3000/api/v1/cron/recurring >> /var/log/book)
+1784012401.582100 quotelab-prod CRON[382415]: (root) CMD (curl -sf -X POST -H 'Authorization: Bearer 0000000000000000000000000000000000000000000000000000000000000000' http://127.0.0.1:3000/api/v1/cron/payment-reminders >> /va)
+1784012402.000123 quotelab-prod CRON[382416]: (root) CMD (curl -sf -X POST -H "Authorization: Bearer 1111111111111111111111111111111111111111111111111111111111111111" http://127.0.0.1:3100/api/v1/cron/dispatch >> /var/log/m)
+not a journal line at all
+1784012500.101010 quotelab-prod CRON[382501]: (root) CMD (   )

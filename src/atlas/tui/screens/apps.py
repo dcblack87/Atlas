@@ -124,7 +124,13 @@ class AppsScreen(Screen):
         backup_age = facts.get("backup.age_hours")
         if isinstance(backup_age, int | float):
             glyph = GLYPH_OK if backup_age < 30 else GLYPH_CRIT
-            lines.append(f"{glyph} newest backup: {backup_age:.1f}h ago")
+            backup_ts = facts.get("backup.last_ts")
+            when = ""
+            if isinstance(backup_ts, int | float):
+                when = f" ({datetime.fromtimestamp(backup_ts).strftime('%d %b %H:%M')})"
+            lines.append(f"{glyph} newest backup: {backup_age:.1f}h ago{when}")
+        else:
+            lines.append(f"{GLYPH_CRIT} no backups found")
 
         # sites (multi-tenant)
         sites = await rt.inventory.entities(kind="site", parent=entity)

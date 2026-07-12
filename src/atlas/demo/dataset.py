@@ -72,7 +72,9 @@ async def seed_demo(db: Database) -> None:
         )
         await inventory.set_fact(f"app:{app}", "git.sha", "d3adb33f" + "0" * 32)
         await inventory.set_fact(f"app:{app}", "git.branch", "main")
-        await inventory.set_fact(f"app:{app}", "backup.age_hours", rng.uniform(2, 8))
+        backup_age = rng.uniform(2, 8)
+        await inventory.set_fact(f"app:{app}", "backup.age_hours", backup_age)
+        await inventory.set_fact(f"app:{app}", "backup.last_ts", int(now - backup_age * 3600))
         for name, state, health, restarts in CONTAINERS[host]:
             key = f"container:{host}/{name}"
             await inventory.upsert(
@@ -181,6 +183,76 @@ async def seed_demo(db: Database) -> None:
                 rng.randint(2, 14),
             ),
         )
+
+    # cron jobs: mostly healthy, one failing backup so screen 9 tells a story
+    crons = [
+        # (host, slug, name, schedule, source, last_run_offset_s, interval, status)
+        (
+            "web-1",
+            "backup-postgres",
+            "Database backup",
+            "0 3 * * *",
+            "crontab",
+            6 * 3600,
+            86400,
+            "ok",
+        ),
+        ("web-1", "renew-metrics", "Renew metrics", "*/15 * * * *", "crontab", 480, 900, "ok"),
+        (
+            "web-1",
+            "report-weekly",
+            "Weekly report",
+            "30 6 * * 1",
+            "crontab",
+            2 * 86400,
+            604800,
+            "ok",
+        ),
+        (
+            "web-2",
+            "backup-shopfront",
+            "Shopfront backup",
+            "0 2 * * *",
+            "crontab",
+            58 * 3600,
+            86400,
+            "failed",
+        ),
+        ("web-2", "renew-sitemap", "Renew sitemap", "0 * * * *", "cron.d", 1800, 3600, "ok"),
+        ("sites-1", "celery-sync-listings", "sync listings", "celery", "celery", 240, 86400, "ok"),
+        (
+            "sites-1",
+            "celery-purge-sessions",
+            "purge sessions",
+            "celery",
+            "celery",
+            7200,
+            86400,
+            "ok",
+        ),
+    ]
+    for host, slug, cname, schedule, source, offset, interval, status in crons:
+        key = f"cron:{host}/{slug}"
+        await inventory.upsert(
+            Entity(
+                EntityKind.CRON,
+                key,
+                parent=f"host:{host}",
+                attrs={"name": cname, "schedule": schedule, "source": source},
+            )
+        )
+        await inventory.set_fact(key, "cron.schedule", schedule)
+        await inventory.set_fact(key, "cron.source", source)
+        await inventory.set_fact(key, "cron.last_run_ts", now - offset)
+        await inventory.set_fact(key, "cron.expected_interval_s", float(interval))
+        await inventory.set_fact(key, "cron.overdue_ratio", round(offset / interval, 2))
+        await inventory.set_fact(key, "cron.last_status", status)
+    await incidents.open_incident(
+        "cron_failed",
+        "cron:web-2/backup-shopfront",
+        "warning",
+        "cron job Shopfront backup on web-2 is failing",
+    )
 
     # M5 texture: costs, drift, security posture, a forecast
     for host, cost in (("web-1", 16.18), ("web-2", 8.51), ("sites-1", 8.51)):

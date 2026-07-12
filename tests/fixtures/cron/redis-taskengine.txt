@@ -1,0 +1,4 @@
+taskengine:last_run:gmail_incremental_sync	{"timestamp": 1784011920.51, "result": {"synced": 12}, "error": null}
+taskengine:last_run:compute_signal_health	{"timestamp": 1783992900.02, "result": null, "error": "IntegrityError: duplicate key value violates unique constraint"}
+taskengine:last_run:broken	not-json
+garbage line without a tab

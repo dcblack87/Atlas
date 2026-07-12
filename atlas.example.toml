@@ -54,6 +54,10 @@ path = "/opt/exampleapp"
 health_url = "http://127.0.0.1:8000/api/health"
 deploy_command = "./scripts/deploy.sh update"
 github_repo = "you/exampleapp"   # optional; enables CI status + deploy drift
+# backups_path = "/mnt/backups/exampleapp"  # optional; default is <path>/backups
+# celery_redis_container = "redis"  # optional; compose service with celery-beat
+#                                   # run metadata (taskengine:last_run:* keys) —
+#                                   # surfaces celery tasks on the Crons screen
 
 [apps.shopfront]
 kind = "single-container"
@@ -83,8 +87,10 @@ max_auto_insights_per_day = 10
 # ── Notifications ────────────────────────────────────────────────────
 [telegram]
 enabled = false
-# bot_token = "..."
-# chat_id = "..."
+# bot_token = "..."               # or $ATLAS_TELEGRAM_TOKEN
+# chat_id = "..."                 # leave unset, send the bot /start, it replies with the id
+# min_severity = "critical"       # "critical" (default) or "warning"
+# bot_commands = true             # answer /status, /backups, /crons ... via long polling
 
 # ── Costs (optional) ─────────────────────────────────────────────────
 # Read-only Hetzner Cloud API tokens, one per project. Atlas only ever GETs.

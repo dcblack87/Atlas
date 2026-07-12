@@ -58,9 +58,27 @@ async def test_dashboard_key_never_blanks_the_screen() -> None:
         assert isinstance(app.screen, DashboardScreen)
 
 
+async def test_crons_screen_renders_demo_jobs() -> None:
+    from textual.widgets import DataTable
+
+    from atlas.tui.screens.crons import CronsScreen
+
+    app = AtlasApp(None, demo=True)
+    async with app.run_test() as pilot:
+        await pilot.pause()  # let the demo runtime seed
+        await pilot.press("9")
+        assert isinstance(app.screen, CronsScreen)
+        for _ in range(20):  # the refresh worker is async
+            await pilot.pause(0.05)
+            if app.screen.query_one("#crons", DataTable).row_count:
+                break
+        assert app.screen.query_one("#crons", DataTable).row_count == 7
+
+
 async def test_every_screen_mounts() -> None:
     from atlas.tui.screens.chat import ChatScreen
     from atlas.tui.screens.cost import CostScreen
+    from atlas.tui.screens.crons import CronsScreen
     from atlas.tui.screens.incidents import IncidentsScreen
     from atlas.tui.screens.logs import LogsScreen
     from atlas.tui.screens.reports import ReportsScreen
@@ -77,6 +95,7 @@ async def test_every_screen_mounts() -> None:
             ("6", CostScreen),
             ("7", SecurityScreen),
             ("8", ReportsScreen),
+            ("9", CronsScreen),
             ("l", LogsScreen),
         ]:
             await pilot.press(key)

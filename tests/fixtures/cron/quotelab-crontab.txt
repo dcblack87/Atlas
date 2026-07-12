@@ -1,0 +1,18 @@
+# Edit this file to introduce tasks to be run by cron.
+#
+# m h  dom mon dow   command
+# Database backups — auto-detects tier (daily Mon-Sat, weekly Sun, monthly 1st)
+0 3 * * * /opt/bookingmachine/scripts/backup-db.sh auto >> /var/log/bookingmachine-backup.log 2>&1
+# Monthly backup at 4 AM on 1st (explicit, overrides auto-detect for timing)
+0 4 1 * * /opt/bookingmachine/scripts/backup-db.sh monthly >> /var/log/bookingmachine-backup.log 2>&1
+# Check for manual trigger files every 5 minutes
+*/5 * * * * for tier in daily weekly monthly; do [ -f /opt/bookingmachine/backups/.trigger-$tier ] && /opt/bookingmachine/scripts/backup-db.sh $tier >> /var/log/bookingmachine-backup.log 2>&1; done
+# --- enable as each ship lands ---
+# --- enable as later ships land ---
+# ── BookingMachine application cron jobs ──────────────────────────────────── # bookingmachine-cron
+# Recurring Bookings — daily at 6:00 AM UTC # bookingmachine-cron
+0 6 * * * curl -sf -X POST -H 'Authorization: Bearer 0000000000000000000000000000000000000000000000000000000000000000' http://127.0.0.1:3000/api/v1/cron/recurring >> /var/log/bookingmachine-cron.log 2>&1 # bookingmachine-cron
+# Payment Reminders — hourly at :30 # bookingmachine-cron
+30 * * * * curl -sf -X POST -H 'Authorization: Bearer 0000000000000000000000000000000000000000000000000000000000000000' http://127.0.0.1:3000/api/v1/cron/payment-reminders >> /var/log/bookingmachine-cron.log 2>&1 # bookingmachine-cron
+# Admin Weekly Digest — Mondays at 7:30 AM UTC # bookingmachine-cron
+30 7 * * 1 curl -sf -X POST -H 'Authorization: Bearer 0000000000000000000000000000000000000000000000000000000000000000' http://127.0.0.1:3000/api/v1/cron/weekly-digest >> /var/log/bookingmachine-cron.log 2>&1 # bookingmachine-cron

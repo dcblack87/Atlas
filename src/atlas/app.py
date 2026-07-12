@@ -19,6 +19,7 @@ from atlas.runtime import Runtime
 from atlas.tui.screens.apps import AppsScreen
 from atlas.tui.screens.chat import ChatScreen
 from atlas.tui.screens.cost import CostScreen
+from atlas.tui.screens.crons import CronsScreen
 from atlas.tui.screens.dashboard import DashboardScreen
 from atlas.tui.screens.deploy import DeployScreen
 from atlas.tui.screens.host import HostScreen
@@ -49,6 +50,7 @@ class AtlasApp(App[None]):
         Binding("6", "goto('cost')", "Cost"),
         Binding("7", "goto('security')", "Security"),
         Binding("8", "goto('reports')", "Reports"),
+        Binding("9", "goto('crons')", "Crons"),
         Binding("h", "goto('hosts')", "Hosts"),
         Binding("l", "goto('logs')", "Logs"),
         Binding("b", "bundle", "Bundle"),
@@ -162,6 +164,9 @@ class AtlasApp(App[None]):
             case "reports":
                 if not isinstance(self.screen, ReportsScreen):
                     self.push_screen(ReportsScreen())
+            case "crons":
+                if not isinstance(self.screen, CronsScreen):
+                    self.push_screen(CronsScreen())
             case _:
                 self.notify(f"{target} — coming soon", severity="warning", timeout=2)
 
@@ -181,7 +186,7 @@ class AtlasApp(App[None]):
     def action_help(self) -> None:
         self.notify(
             "1 Dashboard · 2 Incidents · 3 Apps · 4 Deploy · 5 Chat · 6 Cost · "
-            "7 Security · 8 Reports · h Hosts · l Logs · b Bundle · c Copy · "
-            "F2/p display profile · q quit",
+            "7 Security · 8 Reports · 9 Crons · h Hosts · l Logs · b Bundle · "
+            "c Copy · F2/p display profile · q quit",
             timeout=4,
         )

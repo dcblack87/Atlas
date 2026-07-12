@@ -1,0 +1,3 @@
+[backup] Backup complete: bookingmachine_daily_20260711_030001.dump.enc (1857312 bytes, 512ms, verified=true)
+[backup] Starting daily backup...
+[backup] ERROR: pg_dump: connection to server failed: FATAL: database "bookingmachine" does not exist
