@@ -59,38 +59,22 @@ class HttpHealthCollector(Collector):
                 if not port:
                     continue
                 url = f"http://127.0.0.1:{port}/"
-                up, ms, code = await _probe(transport, url)
+                up, ms, _code = await _probe(transport, url)
+                # Down is judged by the http_down metric rule (2 consecutive
+                # failed probes), never by one curl blip. No finding here.
                 obs.samples.append(Sample("http.up", 1.0 if up else 0.0, site["key"]))
                 if up:
                     obs.samples.append(Sample("http.response_ms", ms, site["key"]))
-                else:
-                    obs.findings.append(
-                        Finding(
-                            "health_down",
-                            site["key"],
-                            Severity.CRITICAL,
-                            f"site {site['key'].split('/')[-1]} not answering "
-                            f"(HTTP {code}) on {host.name}",
-                        )
-                    )
             return
 
         url = app.liveness_url or app.health_url
         if url is None:
             return
-        up, ms, code = await _probe(transport, url)
+        up, ms, _code = await _probe(transport, url)
         obs.samples.append(Sample("http.up", 1.0 if up else 0.0, entity))
         if up:
             obs.samples.append(Sample("http.response_ms", ms, entity))
         else:
-            obs.findings.append(
-                Finding(
-                    "health_down",
-                    entity,
-                    Severity.CRITICAL,
-                    f"{app_name} not answering (HTTP {code}) on {host.name}",
-                )
-            )
             return
 
         # Structured health endpoints get their JSON recorded as facts.
