@@ -1,0 +1,11 @@
+/etc/cron.d/outreach-agent:# Outreach Agent cron jobs — managed by scripts/setup-crons.sh. Do not edit by hand.
+/etc/cron.d/outreach-agent:# Independent of the user crontab so it never touches BookingApp's schedule.
+/etc/cron.d/outreach-agent:SHELL=/bin/bash
+/etc/cron.d/outreach-agent:PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+/etc/cron.d/outreach-agent:
+/etc/cron.d/outreach-agent:# Scheduler tick — every minute; fires due jobs per DB cron_schedules.
+/etc/cron.d/outreach-agent:* * * * * root curl -sf -X POST -H "Authorization: Bearer 1111111111111111111111111111111111111111111111111111111111111111" http://127.0.0.1:3100/api/v1/cron/dispatch >> /var/log/outreach-agent-cron.log 2>&1
+/etc/cron.d/outreach-agent:# Nightly DB backup — daily at 02:30 UTC (fixed; not an API job)
+/etc/cron.d/outreach-agent:30 2 * * * root bash /opt/outreach-agent/scripts/backup-db.sh auto >> /var/log/outreach-agent-backup.log 2>&1
+/etc/cron.d/certbot:# /etc/cron.d/certbot: crontab entries for the certbot package
+/etc/cron.d/certbot:0 */12 * * * root test -x /usr/bin/certbot && perl -e 'sleep int(rand(43200))' && certbot -q renew

@@ -158,4 +158,14 @@ FACT_RULES: tuple[FactRule, ...] = (
         below=True,
         title="disk on {entity} full in ~{value} days at current growth",
     ),
+    # warn=2 tolerates one missed fire plus jitter; crit=6 means a daily job
+    # has been dark for nearly a week. The ratio is cadence-normalized by the
+    # collector, so one rule covers minutely and monthly jobs alike.
+    FactRule(
+        "cron_stale",
+        "cron.overdue_ratio",
+        warn=2,
+        crit=6,
+        title="cron job {entity} has not run for {value}x its cadence",
+    ),
 )

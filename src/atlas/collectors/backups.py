@@ -34,11 +34,12 @@ class BackupsCollector(Collector):
             app = ctx.apps.get(app_name)
             if app is None:
                 continue
+            backups_path = app.backups_path or f"{app.path}/backups"
             result = await transport.run(
                 [
                     "sh",
                     "-c",
-                    f"find {app.path}/backups -type f "
+                    f"find {backups_path} -type f "
                     f"\\( -name '*.gz' -o -name '*.dump' -o -name '*.sql' -o -name '*.enc' \\) "
                     f"-printf '%T@ %s\\n' 2>/dev/null | sort -rn | head -1",
                 ],
@@ -51,6 +52,7 @@ class BackupsCollector(Collector):
             entity = f"app:{app_name}"
             age_hours = round((time.time() - mtime) / 3600, 1)
             obs.facts[(entity, "backup.age_hours")] = age_hours
+            obs.facts[(entity, "backup.last_ts")] = int(mtime)
             obs.samples.append(Sample("backup.size_bytes", size, entity))
         return obs
 

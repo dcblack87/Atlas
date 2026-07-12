@@ -61,6 +61,8 @@ class AppConfig(BaseModel):
     sites_dir: str | None = None  # multi-site: where sites/<name>/.port live
     container_prefix: str | None = None  # multi-site: e.g. "sitefarm-"
     github_repo: str | None = None  # "owner/repo" for CI status + drift
+    backups_path: str | None = None  # override for the <path>/backups convention
+    celery_redis_container: str | None = None  # compose service holding celery-beat run metadata
 
     @model_validator(mode="after")
     def _kind_requirements(self) -> AppConfig:
@@ -87,6 +89,8 @@ class TelegramSection(BaseModel):
     enabled: bool = False
     bot_token: str | None = None
     chat_id: str | None = None
+    min_severity: Literal["critical", "warning"] = "critical"
+    bot_commands: bool = True  # answer /status etc. via long polling
 
     def resolve_token(self) -> str | None:
         return os.environ.get("ATLAS_TELEGRAM_TOKEN") or self.bot_token

@@ -1,4 +1,5 @@
-"""Telegram alerts — critical incidents only, deduped and rate-limited.
+"""Telegram alerts — critical incidents only by default, deduped and
+rate-limited. ``min_severity = "warning"`` opts into more.
 
 Everything else waits for the morning brief. Alert fatigue is a design bug,
 not a user preference.
@@ -21,6 +22,9 @@ log = logging.getLogger(__name__)
 MIN_SECONDS_BETWEEN_ALERTS = 60
 DEDUPE_WINDOW_S = 3600
 
+_SEVERITY_RANK = {"warning": 1, "critical": 2}
+_OPEN_GLYPH = {"warning": "⚠️", "critical": "🔴"}
+
 
 class TelegramNotifier:
     def __init__(self, config: TelegramSection, db: Database, bus: Bus) -> None:
@@ -37,10 +41,15 @@ class TelegramNotifier:
             log.info("telegram alerts disabled")
 
     async def _on_incident(self, event: IncidentEvent) -> None:
-        if event.kind == "opened" and event.severity == "critical":
-            text = f"🔴 ATLAS: {event.title}"
-        elif event.kind == "resolved" and event.severity == "critical":
+        threshold = _SEVERITY_RANK[self._config.min_severity]
+        if _SEVERITY_RANK.get(event.severity, 0) < threshold:
+            return
+        if event.kind == "opened":
+            text = f"{_OPEN_GLYPH.get(event.severity, '🔴')} ATLAS: {event.title}"
+        elif event.kind == "resolved":
             text = f"✅ ATLAS resolved: {event.title}"
+        elif event.kind == "escalated":
+            text = f"🔴 ATLAS escalated: {event.title}"
         else:
             return
 
@@ -57,11 +66,22 @@ class TelegramNotifier:
     async def _send(self, text: str, incident_id: int | None) -> None:
         token = self._config.resolve_token()
         delivered, error = False, None
+        payload: dict = {"chat_id": self._config.chat_id, "text": text}
+        if self._config.bot_commands:
+            # quick actions handled by the bot's poller (see notify/bot)
+            payload["reply_markup"] = {
+                "inline_keyboard": [
+                    [
+                        {"text": "🚨 Incidents", "callback_data": "cmd:incidents"},
+                        {"text": "📊 Status", "callback_data": "cmd:status"},
+                    ]
+                ]
+            }
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 response = await client.post(
                     f"https://api.telegram.org/bot{token}/sendMessage",
-                    json={"chat_id": self._config.chat_id, "text": text},
+                    json=payload,
                 )
                 delivered = response.status_code == 200
                 if not delivered:

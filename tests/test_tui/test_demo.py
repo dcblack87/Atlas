@@ -11,14 +11,16 @@ async def test_demo_seed(tmp_path) -> None:
     await seed_demo(db)
     hosts = await db.fetch_value("SELECT COUNT(*) FROM entities WHERE kind='host'")
     sites = await db.fetch_value("SELECT COUNT(*) FROM entities WHERE kind='site'")
+    crons = await db.fetch_value("SELECT COUNT(*) FROM entities WHERE kind='cron'")
     raw = await db.fetch_value("SELECT COUNT(*) FROM metrics_raw")
     open_incidents = await db.fetch_value(
         "SELECT COUNT(*) FROM incidents WHERE status != 'resolved'"
     )
     assert hosts == 3
     assert sites == 3
+    assert crons == 7
     assert raw > 1000  # a day of history for sparklines
-    assert open_incidents == 1  # the expiring-cert story
+    assert open_incidents == 2  # the expiring-cert story + the failing backup cron
     await db.close()
 
 

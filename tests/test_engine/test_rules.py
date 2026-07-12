@@ -41,3 +41,10 @@ class TestFactRule:
         assert backup.judge(8) is None
         assert backup.judge(40) is Severity.WARNING
         assert backup.judge(60) is Severity.CRITICAL
+
+    def test_cron_stale(self) -> None:
+        cron = FactRule("cron_stale", "cron.overdue_ratio", warn=2, crit=6)
+        assert cron.judge(0.9) is None  # ran on schedule
+        assert cron.judge(1.8) is None  # one missed fire plus jitter is fine
+        assert cron.judge(2.5) is Severity.WARNING
+        assert cron.judge(7.0) is Severity.CRITICAL

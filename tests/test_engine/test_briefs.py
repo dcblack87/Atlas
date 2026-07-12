@@ -14,7 +14,7 @@ async def test_skeleton_from_demo(tmp_path: Path) -> None:
     await seed_demo(db)
     skeleton = await build_skeleton(db, window_s=86400)
     assert "fleet health" in skeleton
-    assert "open incidents: 1" in skeleton
+    assert "open incidents: 2" in skeleton  # expiring cert + failing backup cron
     assert "forecast" in skeleton  # web-2 disk forecast is seeded
     await db.close()
 

@@ -67,6 +67,12 @@ class Runtime:
         )
         runtime._wire_ai(config, db, bus)
         runtime._tasks.append(asyncio.create_task(runtime._housekeeping(), name="housekeeping"))
+        telegram = config.telegram
+        if telegram.enabled and telegram.bot_commands and telegram.resolve_token():
+            from atlas.notify.bot import TelegramBot
+
+            bot = TelegramBot(telegram, runtime)
+            runtime._tasks.append(asyncio.create_task(bot.run(), name="telegram-bot"))
         return runtime
 
     def _wire_ai(self, config: Config, db: Database, bus: Bus) -> None:
