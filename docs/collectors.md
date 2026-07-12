@@ -23,7 +23,7 @@ class SwapCollector(Collector):
 Guidelines:
 
 - **One composite command per run** where possible. Join reads with a
-  sentinel separator and parse locally — SSH channels are cheap but not free.
+  sentinel separator and parse locally; SSH channels are cheap but not free.
 - **`analyze()` must be pure.** It receives the observation plus recent
   history and returns findings. Purity makes it trivially testable against
   recorded fixtures in `tests/fixtures/`.
