@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# README screenshots are regenerated from demo mode; treat as build artefacts
+docs/screenshots/*.svg linguist-generated -diff
+docs/screenshots/*.gif binary linguist-generated

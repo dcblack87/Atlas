@@ -33,10 +33,10 @@ Atlas is one Python process: an asyncio core with a Textual UI on top.
 
 ## Layers
 
-- **Transport** (`atlas.transport`) — a `Transport` protocol with `run()` and `stream()`. `LocalTransport` shells out via subprocess (used for the host Atlas runs on — no dependency on sshd for self-monitoring). `SSHTransport` holds one asyncssh connection per host and multiplexes channels over it, with keepalives and capped-backoff reconnect.
-- **Collectors** (`atlas.collectors`) — one file per concern, registered by decorator. Each implements `discover()` (inventory), `collect()` (one composite command per run), and `analyze()` (pure function, unit-testable against recorded fixtures).
-- **Store** (`atlas.store`) — SQLite in WAL mode, single writer task. Raw metrics are kept 48h, hourly rollups 90 days, daily rollups forever. Numbered SQL migrations gated by `PRAGMA user_version`.
-- **Engine** (`atlas.engine`) — a declarative rule table with hysteresis, an incident lifecycle with dedupe and auto-resolve, per-entity health scores, and least-squares forecasting ("disk full in ~23 days").
-- **AI** (`atlas.ai`) — context assembly straight from SQLite (RAG-lite: entity/time-scoped SQL, no vector DB), budget-gated Anthropic client with prompt caching, insight generation, chat, and Markdown context bundles for use with Claude Code.
-- **Deploy** (`atlas.deploy`) — preflight → typed confirmation → streamed execution → post-deploy verification → audit row. Guided remediations run through the same gate from an allowlist of templates.
-- **TUI** (`atlas.tui`) — Textual screens and widgets, tuned for e-ink: no animation, change-driven rendering, coalesced update flushes, fixed layouts that never reflow on value changes.
+- **Transport** (`atlas.transport`): a `Transport` protocol with `run()` and `stream()`. `LocalTransport` shells out via subprocess (used for the host Atlas runs on, so self-monitoring has no dependency on sshd). `SSHTransport` holds one asyncssh connection per host and multiplexes channels over it, with keepalives and capped-backoff reconnect.
+- **Collectors** (`atlas.collectors`): one file per concern, registered by decorator. Each implements `discover()` (inventory), `collect()` (one composite command per run), and `analyze()` (pure function, unit-testable against recorded fixtures).
+- **Store** (`atlas.store`): SQLite in WAL mode, single writer task. Raw metrics are kept 48h, hourly rollups 90 days, daily rollups forever. Numbered SQL migrations gated by `PRAGMA user_version`.
+- **Engine** (`atlas.engine`): a declarative rule table with hysteresis, an incident lifecycle with dedupe and auto-resolve, per-entity health scores, and least-squares forecasting ("disk full in ~23 days").
+- **AI** (`atlas.ai`): context assembly straight from SQLite (RAG-lite: entity/time-scoped SQL, no vector DB), budget-gated Anthropic client with prompt caching, insight generation, chat, and Markdown context bundles for use with Claude Code.
+- **Deploy** (`atlas.deploy`): preflight → typed confirmation → streamed execution → post-deploy verification → audit row. Guided remediations run through the same gate from an allowlist of templates.
+- **TUI** (`atlas.tui`): Textual screens and widgets, tuned for e-ink: no animation, change-driven rendering, coalesced update flushes, fixed layouts that never reflow on value changes.
