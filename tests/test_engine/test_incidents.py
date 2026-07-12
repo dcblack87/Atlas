@@ -91,6 +91,67 @@ async def test_health_scores(env) -> None:
     assert scores["fleet"] < 100
 
 
+async def test_http_blip_does_not_open_incident(env) -> None:
+    """One failed probe (curl blip under load) must not page anyone."""
+    db, bus, manager, events = env
+    metrics = Metrics(db)
+    entity = "site:directorylab/mobiledetailing"
+
+    async def probe(value: float) -> None:
+        samples = [Sample("http.up", value, entity)]
+        await metrics.write(samples)
+        await bus.publish(SamplesEvent("directorylab-1", "http_health", samples))
+
+    await probe(1.0)
+    await probe(0.0)  # the blip
+    await probe(1.0)
+    assert await manager.store.open_incidents() == []
+    assert events == []
+
+
+async def test_http_down_opens_after_two_probes_and_resolves_fast(env) -> None:
+    db, bus, manager, events = env
+    metrics = Metrics(db)
+    entity = "site:directorylab/mobiledetailing"
+
+    async def probe(value: float) -> None:
+        samples = [Sample("http.up", value, entity)]
+        await metrics.write(samples)
+        await bus.publish(SamplesEvent("directorylab-1", "http_health", samples))
+
+    await probe(0.0)
+    await probe(0.0)
+    open_incidents = await manager.store.open_incidents()
+    assert len(open_incidents) == 1
+    assert open_incidents[0]["rule_id"] == "http_down"
+    assert open_incidents[0]["severity"] == "critical"
+
+    await probe(1.0)  # first good probe resolves, not a 30-minute sweep
+    assert await manager.store.open_incidents() == []
+    assert [e.kind for e in events] == ["opened", "resolved"]
+
+
+async def test_legacy_health_down_clears_on_good_probe(env) -> None:
+    """Incidents opened under the old health_down rule id resolve the moment
+    a good http.up sample arrives (covers open incidents across an upgrade)."""
+    db, bus, manager, _events = env
+    metrics = Metrics(db)
+    entity = "site:directorylab/mobiledetailing"
+    await bus.publish(
+        FindingsEvent(
+            "directorylab-1",
+            "http_health",
+            [Finding("health_down", entity, Severity.CRITICAL, "not answering (HTTP 000)")],
+        )
+    )
+    assert len(await manager.store.open_incidents()) == 1
+
+    samples = [Sample("http.up", 1.0, entity)]
+    await metrics.write(samples)
+    await bus.publish(SamplesEvent("directorylab-1", "http_health", samples))
+    assert await manager.store.open_incidents() == []
+
+
 async def test_host_down_recovers_on_host_up(env) -> None:
     """host.up=1 must clear a host_down incident and un-stick the dashboard."""
     db, bus, manager, events = env

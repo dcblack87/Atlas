@@ -65,10 +65,16 @@ class IncidentManager:
         # A host reporting up again clears its (transport-level) host_down —
         # host_down is a collector finding, not a metric rule, so resolve it
         # here the moment connectivity returns rather than waiting on the sweep.
+        # Likewise a good probe clears health_down (the pre-2026-07 rule id
+        # for HTTP liveness; http_down owns it now) so old open incidents
+        # resolve on the first good probe instead of leaking.
         for sample in event.samples:
             if sample.metric == "host.up" and sample.value >= 1:
                 await self._clear("host_down", sample.entity)
                 self._last_asserted.pop(("host_down", sample.entity), None)
+            elif sample.metric == "http.up" and sample.value >= 1:
+                await self._clear("health_down", sample.entity)
+                self._last_asserted.pop(("health_down", sample.entity), None)
 
         touched = {(s.entity, s.metric) for s in event.samples}
         for rule in METRIC_RULES:
