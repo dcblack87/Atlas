@@ -23,7 +23,7 @@ async def env(tmp_path: Path):
 
 
 async def test_host_headroom(env) -> None:
-    inv, metrics = env
+    _inv, metrics = env
     await metrics.write(
         [
             Sample("mem.total_bytes", 4 * GB, "host:a"),
@@ -40,7 +40,7 @@ async def test_host_headroom(env) -> None:
 
 
 async def test_no_data_returns_none(env) -> None:
-    inv, metrics = env
+    _inv, metrics = env
     assert await host_headroom(metrics, "a") is None
 
 
