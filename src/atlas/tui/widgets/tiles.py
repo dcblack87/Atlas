@@ -20,10 +20,16 @@ GLYPH_CRIT = "✖"
 
 
 class StatTile(Vertical):
-    """A titled value tile: fixed size, no reflow on value change."""
+    """A titled value tile: fixed size, no reflow on value change.
+
+    ``hint`` is an optional one-line detail under the value (worst host,
+    which app is behind, ...). Hidden entirely in the glance profile, where
+    only the big value must survive across-the-room viewing.
+    """
 
     value: reactive[str] = reactive("—")
     status: reactive[str] = reactive("ok")  # ok | warn | crit
+    hint: reactive[str] = reactive("")
 
     def __init__(self, title: str, *, id: str | None = None) -> None:
         super().__init__(id=id, classes="tile")
@@ -32,10 +38,15 @@ class StatTile(Vertical):
     def compose(self) -> ComposeResult:
         yield Static(self._title, classes="tile-title")
         yield Static(self.value, classes="tile-value", id="value")
+        yield Static(self.hint, classes="tile-hint", id="hint")
 
     def watch_value(self, value: str) -> None:
         if self.is_mounted:
             self.query_one("#value", Static).update(value)
+
+    def watch_hint(self, hint: str) -> None:
+        if self.is_mounted:
+            self.query_one("#hint", Static).update(hint)
 
     def watch_status(self, status: str) -> None:
         if not self.is_mounted:

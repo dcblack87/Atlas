@@ -23,4 +23,10 @@ App.-profile-glance .tile-value {
     text-align: center;
 }
 
+/* glance is the across-the-room view: the big value only */
+App.-profile-glance .tile-hint { display: none; }
+
+/* glance tiles carry extra padding; give the row the height back */
+App.-profile-glance DashboardScreen Grid { height: 7; }
+
 App.-profile-glance .status-crit { color: black; text-style: bold reverse; }

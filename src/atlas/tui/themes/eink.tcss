@@ -22,6 +22,10 @@ App.-profile-eink .tile-value {
     color: black;
 }
 
+App.-profile-eink .tile-hint {
+    color: black;
+}
+
 /* severity carried by weight, not hue — survives greyscale */
 App.-profile-eink .status-ok { color: black; }
 App.-profile-eink .status-warn { color: black; text-style: bold; }

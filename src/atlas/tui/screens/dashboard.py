@@ -33,10 +33,14 @@ class DashboardScreen(Screen):
         text-style: bold;
     }
     DashboardScreen Grid {
-        grid-size: 4;
+        grid-size: 5;
         grid-gutter: 1;
-        height: 9;
+        height: 5;
         margin: 0 1;
+    }
+    DashboardScreen .tile-value, DashboardScreen .tile-hint {
+        text-wrap: nowrap;
+        text-overflow: ellipsis;
     }
     DashboardScreen #hosts, DashboardScreen #apps {
         margin: 1 1;
@@ -55,12 +59,13 @@ class DashboardScreen(Screen):
 
         tiles = {
             tile_id: self.query_one(f"#{tile_id}", StatTile).value
-            for tile_id in ("health", "hosts-count", "apps-count", "incidents")
+            for tile_id in ("health", "hosts-count", "apps-count", "incidents", "deploys")
         }
         parts = [
             f"ATLAS fleet summary — {datetime.now():%Y-%m-%d %H:%M}",
             f"health {tiles['health']} | hosts {tiles['hosts-count']} | "
-            f"apps {tiles['apps-count']} | open incidents {tiles['incidents']}",
+            f"apps {tiles['apps-count']} | open incidents {tiles['incidents']} | "
+            f"deploys {tiles['deploys']}",
             getattr(self.query_one("#hosts", Static), "_atlas_last", "") or "",
             getattr(self.query_one("#apps", Static), "_atlas_last", "") or "",
         ]
@@ -72,7 +77,8 @@ class DashboardScreen(Screen):
             yield StatTile("Fleet Health", id="health")
             yield StatTile("Hosts", id="hosts-count")
             yield StatTile("Apps", id="apps-count")
-            yield StatTile("Open Incidents", id="incidents")
+            yield StatTile("Incidents", id="incidents")
+            yield StatTile("Deploys", id="deploys")
         yield Static("starting collectors…", id="hosts")
         yield Static("", id="apps")
         yield Footer()
@@ -106,29 +112,15 @@ class DashboardScreen(Screen):
         apps = await rt.inventory.entities(kind="app")
         sites = await rt.inventory.entities(kind="site")
 
-        self._set_tile("hosts-count", str(len(hosts)))
-        apps_label = str(len(apps)) if not sites else f"{len(apps)} (+{len(sites)} sites)"
-        self._set_tile("apps-count", apps_label)
-
-        scores = await health_scores(rt.incidents.store)
-        fleet = scores["fleet"]
-        health_tile = self.query_one("#health", StatTile)
-        health_tile.value = f"{fleet}/100"
-        health_tile.status = "ok" if fleet >= 90 else "warn" if fleet >= 60 else "crit"
-
-        open_incidents = await rt.incidents.store.open_incidents()
-        crit = sum(1 for i in open_incidents if i["severity"] == "critical")
-        incidents_tile = self.query_one("#incidents", StatTile)
-        incidents_tile.value = "0" if not open_incidents else f"{len(open_incidents)} ({crit} crit)"
-        incidents_tile.status = "crit" if crit else "warn" if open_incidents else "ok"
-
         lines = []
+        down: list[str] = []
         for host in hosts:
             snap = await rt.metrics.latest_snapshot(host["key"])
             name = host["key"].removeprefix("host:")
             up = snap.get("host.up", 1.0) > 0
             glyph = GLYPH_OK if up else GLYPH_CRIT
             if not up:
+                down.append(name)
                 lines.append(f"{glyph} {name:<18} UNREACHABLE")
                 continue
             load = snap.get("load.1m")
@@ -158,17 +150,92 @@ class DashboardScreen(Screen):
             )
         text = "\n".join(lines) if lines else "no hosts discovered yet"
         self._update_static("hosts", text)
-        await self._refresh_apps(rt, apps)
 
-    async def _refresh_apps(self, rt, apps: list[dict]) -> None:
+        # deploy drift: which apps have commits on origin/main that are not
+        # deployed yet? (facts written by the github collector)
+        behind: dict[str, int] = {}
+        drift_known = False
+        for app in apps:
+            facts = await rt.inventory.facts_for(app["key"])
+            commits = facts.get("drift.commits_behind")
+            if isinstance(commits, int | float):
+                drift_known = True
+                if commits > 0:
+                    behind[app["key"].removeprefix("app:")] = int(commits)
+
+        self._refresh_tiles(
+            hosts=hosts, down=down, apps=apps, sites=sites, behind=behind, drift_known=drift_known
+        )
+        await self._refresh_health_tiles(rt)
+        await self._refresh_apps(rt, apps, behind)
+
+    def _refresh_tiles(
+        self,
+        *,
+        hosts: list[dict],
+        down: list[str],
+        apps: list[dict],
+        sites: list[dict],
+        behind: dict[str, int],
+        drift_known: bool,
+    ) -> None:
+        hosts_tile = self.query_one("#hosts-count", StatTile)
+        hosts_tile.value = f"{len(hosts) - len(down)}/{len(hosts)} up" if down else str(len(hosts))
+        hosts_tile.status = "crit" if down else "ok"
+        hosts_tile.hint = f"{down[0]} unreachable" if down else "all reachable"
+
+        apps_tile = self.query_one("#apps-count", StatTile)
+        apps_tile.value = str(len(apps))
+        apps_tile.hint = f"+{len(sites)} tenant sites" if sites else ""
+
+        deploys_tile = self.query_one("#deploys", StatTile)
+        if behind:
+            noun = "app" if len(behind) == 1 else "apps"
+            deploys_tile.value = f"{len(behind)} {noun} behind"
+            worst_app, worst_n = max(behind.items(), key=lambda kv: kv[1])
+            deploys_tile.hint = f"{worst_app} ▲{worst_n}"
+            deploys_tile.status = "warn"
+        elif drift_known:
+            deploys_tile.value = "in sync"
+            deploys_tile.hint = "all at origin/main"
+            deploys_tile.status = "ok"
+        else:
+            deploys_tile.value = "—"
+            deploys_tile.hint = "no drift data yet"
+            deploys_tile.status = "ok"
+
+    async def _refresh_health_tiles(self, rt) -> None:
+        scores = await health_scores(rt.incidents.store)
+        fleet = scores["fleet"]
+        health_tile = self.query_one("#health", StatTile)
+        health_tile.value = f"{fleet}/100"
+        health_tile.status = "ok" if fleet >= 90 else "warn" if fleet >= 60 else "crit"
+        affected = len(scores) - 1  # minus the fleet aggregate
+        health_tile.hint = f"{affected} affected" if affected else "no deductions"
+
+        open_incidents = await rt.incidents.store.open_incidents()
+        crit = sum(1 for i in open_incidents if i["severity"] == "critical")
+        incidents_tile = self.query_one("#incidents", StatTile)
+        incidents_tile.value = str(len(open_incidents))
+        incidents_tile.status = "crit" if crit else "warn" if open_incidents else "ok"
+        if crit:
+            incidents_tile.hint = f"{crit} critical"
+        elif open_incidents:
+            n = len(open_incidents)
+            incidents_tile.hint = f"{n} warning" if n == 1 else f"{n} warnings"
+        else:
+            incidents_tile.hint = "all quiet"
+
+    async def _refresh_apps(self, rt, apps: list[dict], behind: dict[str, int]) -> None:
         """One row per app; multi-site apps expand to one row per site."""
         lines = ["APPS"]
         for app in apps:
             name = app["key"].removeprefix("app:")
             host = (app["parent"] or "").removeprefix("host:")
+            drift = f"   ▲{behind[name]} to deploy · press 4" if name in behind else ""
             sites = await rt.inventory.entities(kind="site", parent=app["key"])
             if sites:
-                lines.append(f"{GLYPH_OK} {name:<22} {host:<16} {len(sites)} sites")
+                lines.append(f"{GLYPH_OK} {name:<22} {host:<16} {len(sites)} sites{drift}")
                 for site in sites:
                     site_name = site["key"].split("/")[-1]
                     snap = await rt.metrics.latest_snapshot(site["key"])
@@ -177,7 +244,7 @@ class DashboardScreen(Screen):
             else:
                 snap = await rt.metrics.latest_snapshot(app["key"])
                 glyph, latency = _liveness(snap)
-                lines.append(f"{glyph} {name:<22} {host:<16} {latency}")
+                lines.append(f"{glyph} {name:<22} {host:<16} {latency:<8}{drift}")
         self._update_static("apps", "\n".join(lines) if len(lines) > 1 else "")
 
     def _update_static(self, widget_id: str, text: str) -> None:

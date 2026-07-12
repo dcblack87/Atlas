@@ -79,10 +79,12 @@ class CostScreen(Screen):
                 f"  today      ${spend['cost_usd']:.3f} of ${spend['budget_usd']:.2f} budget"
                 f"   ({spend['calls']} calls, ${spend['auto_cost_usd']:.3f} auto)"
             )
-            history = await rt.db.fetch_all("SELECT * FROM ai_spend ORDER BY day DESC LIMIT 7")
-            for row in history:
-                ai_lines.append(f"  {row['day']}  ${row['cost_usd']:.3f} ({row['calls']} calls)")
-        else:
+        # the ledger outlives the client: show recorded spend even when the
+        # AI is unconfigured (or in demo mode)
+        history = await rt.db.fetch_all("SELECT * FROM ai_spend ORDER BY day DESC LIMIT 7")
+        for row in history:
+            ai_lines.append(f"  {row['day']}  ${row['cost_usd']:.3f} ({row['calls']} calls)")
+        if rt.ai is None and not history:
             ai_lines.append("  AI not configured")
         self._update("ai", "\n".join(ai_lines))
 

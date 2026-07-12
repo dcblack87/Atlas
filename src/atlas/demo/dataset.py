@@ -44,6 +44,14 @@ BASELINES = {  # (load, mem%, disk%)
     "sites-1": (0.25, 52, 44),
 }
 
+TOTALS = {  # (mem GB, disk GB) — feeds headroom / site-capacity estimates
+    "web-1": (8, 80),
+    "web-2": (4, 40),
+    "sites-1": (8, 80),
+}
+
+GB = 1024**3
+
 
 async def seed_demo(db: Database) -> None:
     rng = random.Random(20260710)  # deterministic — stable screenshots
@@ -86,8 +94,18 @@ async def seed_demo(db: Database) -> None:
                     Sample("container.restarts", float(restarts), key),
                     Sample("container.cpu_pct", round(rng.uniform(0.1, 4.0), 2), key),
                     Sample("container.mem_pct", round(rng.uniform(0.5, 12.0), 1), key),
+                    Sample("container.mem_bytes", rng.uniform(180, 420) * 1024**2, key),
                 ]
             )
+        mem_gb, disk_gb = TOTALS[host]
+        _, _, disk_pct = BASELINES[host]
+        await metrics.write(
+            [
+                Sample("mem.total_bytes", float(mem_gb * GB), host_key),
+                Sample("disk.total_bytes", float(disk_gb * GB), host_key),
+                Sample("disk.used_bytes", disk_gb * GB * disk_pct / 100, host_key),
+            ]
+        )
 
     for site in SITES:
         await inventory.upsert(
@@ -149,6 +167,20 @@ async def seed_demo(db: Database) -> None:
     )
     await incidents.resolve(resolved, "recovered after container restart")
     await incidents.add_event(None, "deploy", "deployed exampleapp 8f31a2c → d3adb33 ✓")
+
+    # a week of AI spend well under a $1.50/day budget
+    for i in range(7):
+        day = time.strftime("%Y-%m-%d", time.gmtime(now - i * 86400))
+        await db.execute(
+            "INSERT OR REPLACE INTO ai_spend (day, cost_usd, auto_cost_usd, calls) "
+            "VALUES (?, ?, ?, ?)",
+            (
+                day,
+                round(rng.uniform(0.04, 0.55), 3),
+                round(rng.uniform(0.01, 0.2), 3),
+                rng.randint(2, 14),
+            ),
+        )
 
     # M5 texture: costs, drift, security posture, a forecast
     for host, cost in (("web-1", 16.18), ("web-2", 8.51), ("sites-1", 8.51)):

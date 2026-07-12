@@ -2,7 +2,7 @@
 
     uv run python scripts/make_screenshots.py
 
-Always demo data, never real infrastructure — that's the rule for anything
+Always demo data, never real infrastructure. That's the rule for anything
 that ends up in git.
 """
 
@@ -31,11 +31,36 @@ async def main() -> None:
         await pilot.press("2")
         await pilot.pause(1.0)
         app.save_screenshot(str(OUT / "incidents.svg"))
-
         await pilot.press("escape")
-        await pilot.press("f2")  # eink profile
+
+        # apps drill-down: shopfront (deploy drift), then sitefarm (capacity)
+        await pilot.press("3")
+        await pilot.pause(0.5)
+        await pilot.press("down", "down")
         await pilot.pause(1.0)
+        app.save_screenshot(str(OUT / "apps.svg"))
+        await pilot.press("down")
+        await pilot.pause(1.0)
+        app.save_screenshot(str(OUT / "apps-sitefarm.svg"))
+        await pilot.press("escape")
+
+        await pilot.press("6")
+        await pilot.pause(1.0)
+        app.save_screenshot(str(OUT / "cost.svg"))
+        await pilot.press("escape")
+
+        await pilot.press("7")
+        await pilot.pause(1.0)
+        app.save_screenshot(str(OUT / "security.svg"))
+        await pilot.press("escape")
+
+        await pilot.press("f2")  # eink profile
+        await pilot.pause(1.5)
         app.save_screenshot(str(OUT / "dashboard-eink.svg"))
+
+        await pilot.press("f2")  # glance profile
+        await pilot.pause(1.5)
+        app.save_screenshot(str(OUT / "dashboard-glance.svg"))
     print(f"wrote {len(list(OUT.glob('*.svg')))} screenshots to {OUT}")
 
 

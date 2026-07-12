@@ -20,6 +20,10 @@ App.-profile-standard .tile-value {
     color: $text;
 }
 
+App.-profile-standard .tile-hint {
+    color: $text-muted;
+}
+
 App.-profile-standard .status-ok { color: $success; }
 App.-profile-standard .status-warn { color: $warning; }
 App.-profile-standard .status-crit { color: $error; }
