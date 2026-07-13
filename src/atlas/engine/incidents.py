@@ -117,6 +117,17 @@ class IncidentManager:
                     await self._raise(rule.finding(row["entity_key"], severity, value))
                 else:
                     await self._clear(rule.id, row["entity_key"])
+            # A fact that disappeared entirely (forecast receded, source
+            # gone) must also clear: the loop above only sees surviving rows.
+            present = {row["entity_key"] for row in rows}
+            stale = await self._db.fetch_all(
+                "SELECT DISTINCT entity_key FROM incidents"
+                " WHERE rule_id = ? AND status != 'resolved'",
+                (rule.id,),
+            )
+            for row in stale:
+                if row["entity_key"] not in present:
+                    await self._clear(rule.id, row["entity_key"])
 
     # ── lifecycle ────────────────────────────────────────────────────
 

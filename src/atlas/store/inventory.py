@@ -99,6 +99,11 @@ class Inventory:
             (entity_key, name, json.dumps(value), int(time.time())),
         )
 
+    async def delete_fact(self, entity_key: str, name: str) -> None:
+        await self._db.execute(
+            "DELETE FROM facts WHERE entity_key = ? AND name = ?", (entity_key, name)
+        )
+
     async def get_fact(self, entity_key: str, name: str) -> object | None:
         value = await self._db.fetch_value(
             "SELECT value FROM facts WHERE entity_key = ? AND name = ?", (entity_key, name)
