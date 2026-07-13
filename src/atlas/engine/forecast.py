@@ -66,3 +66,7 @@ async def run_forecasts(db: Database, now: float | None = None) -> None:
             days = days_until(points, ceiling, now)
             if days is not None and days < 365:
                 await inventory.set_fact(host["key"], fact_name, days)
+            else:
+                # Trend flattened or receded (e.g. disk was pruned): drop the
+                # fact, otherwise the stale projection keeps its incident open.
+                await inventory.delete_fact(host["key"], fact_name)
