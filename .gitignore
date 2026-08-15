@@ -1,10 +1,5 @@
 # Real inventory & secrets — NEVER commit. Use atlas.example.toml as the template.
 atlas.toml
-# ...and anything derived from it. `atlas.toml` alone did not cover
-# `atlas.toml.bak.<timestamp>`, so a backup written beside it was committable —
-# and was committed. A revert does not remove a file from history.
-atlas.toml.*
-*.toml.bak*
 *.env
 .env*
 
