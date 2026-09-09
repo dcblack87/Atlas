@@ -151,12 +151,22 @@ class IncidentManager:
                 )
             )
         elif existing["severity"] == Severity.WARNING and finding.severity == Severity.CRITICAL:
-            await self._store.escalate(existing["id"], finding.severity, finding.title)
+            await self._store.escalate(
+                existing["id"], finding.severity, finding.title, finding.detail
+            )
             await self._bus.publish(
                 IncidentEvent(
                     existing["id"], "escalated", finding.severity, finding.title, finding.entity
                 )
             )
+        elif existing["title"] != finding.title or existing["detail"] != json.dumps(
+            finding.detail or {}
+        ):
+            # Same severity, moved numbers. Without this the stored title and
+            # detail stay frozen at whatever opened the incident, and every
+            # consumer (notifications, AI context, reports) quotes a value that
+            # may be days stale — or, after an escalation, contradicts itself.
+            await self._store.refresh(existing["id"], finding.title, finding.detail)
 
     async def _clear(self, rule_id: str, entity: str) -> None:
         existing = await self._store.find_open(rule_id, entity)
