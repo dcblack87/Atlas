@@ -1,5 +1,6 @@
 """Incident lifecycle: open, dedupe, escalate, resolve, suppress."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,7 @@ from atlas.engine.health import health_scores
 from atlas.engine.incidents import IncidentManager
 from atlas.model import Finding, Sample, Severity
 from atlas.store.db import Database
+from atlas.store.inventory import Inventory
 from atlas.store.metrics import Metrics
 
 
@@ -175,3 +177,50 @@ async def test_host_down_recovers_on_host_up(env) -> None:
     await bus.publish(SamplesEvent("a", "transport", up))
     assert await manager.store.open_incidents() == []
     assert "resolved" in [e.kind for e in events]
+
+
+async def test_open_incident_tracks_the_current_value(env) -> None:
+    """An open incident quotes now, not whatever opened it.
+
+    Reproduces the bookingmachine case: opened at 30.3h, escalated at 54.2h,
+    and the stored detail was still saying 30.3 two days later while the
+    title said 54.2 and the fact itself had reached 58.1.
+    """
+    db, _bus, manager, events = env
+    inventory = Inventory(db)
+
+    for age in (30.3, 54.2, 58.1):
+        await inventory.set_fact("app:bm", "backup.age_hours", age)
+        await manager.evaluate_facts()
+
+    incident = (await manager.store.open_incidents())[0]
+    assert incident["severity"] == "critical"
+    assert "58.1h" in incident["title"]
+    assert json.loads(incident["detail"])["value"] == 58.1
+
+    # The two refreshes are silent: a condition that persists is re-judged
+    # every sweep, so only the real transitions may notify.
+    assert [e.kind for e in events] == ["opened", "escalated"]
+    assert [e["kind"] for e in await manager.store.timeline(3600)] == ["escalated", "opened"]
+
+
+async def test_escalation_carries_detail(env) -> None:
+    _db, bus, manager, _events = env
+    for severity, streak in ((Severity.WARNING, 1), (Severity.CRITICAL, 3)):
+        await bus.publish(
+            FindingsEvent(
+                "a",
+                "cron",
+                [
+                    Finding(
+                        "cron_failed",
+                        "cron:a/backup",
+                        severity,
+                        f"cron job backup on a is failing ({streak})",
+                        detail={"streak": streak},
+                    )
+                ],
+            )
+        )
+    incident = (await manager.store.open_incidents())[0]
+    assert json.loads(incident["detail"])["streak"] == 3

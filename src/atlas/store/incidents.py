@@ -26,12 +26,26 @@ class IncidentStore:
         await self.add_event(incident_id, "opened", title)
         return incident_id
 
-    async def escalate(self, incident_id: int, severity: str, title: str) -> None:
+    async def escalate(
+        self, incident_id: int, severity: str, title: str, detail: dict | None = None
+    ) -> None:
         await self._db.execute(
-            "UPDATE incidents SET severity = ?, title = ? WHERE id = ?",
-            (severity, title, incident_id),
+            "UPDATE incidents SET severity = ?, title = ?, detail = ? WHERE id = ?",
+            (severity, title, json.dumps(detail or {}), incident_id),
         )
         await self.add_event(incident_id, "escalated", title)
+
+    async def refresh(self, incident_id: int, title: str, detail: dict | None = None) -> None:
+        """Update an open incident's current numbers in place.
+
+        Silent by design: no timeline event, no bus publish. A condition that
+        persists is re-judged every sweep, so anything noisy here would fire
+        every 60s. Severity is left alone — incidents don't de-escalate.
+        """
+        await self._db.execute(
+            "UPDATE incidents SET title = ?, detail = ? WHERE id = ?",
+            (title, json.dumps(detail or {}), incident_id),
+        )
 
     async def resolve(self, incident_id: int, note: str = "") -> None:
         await self._db.execute(

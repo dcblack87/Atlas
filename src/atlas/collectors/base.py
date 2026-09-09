@@ -20,7 +20,8 @@ if TYPE_CHECKING:
 REGISTRY: dict[str, type[Collector]] = {}
 
 
-def register(cls: type[Collector]) -> type[Collector]:
+def register[C: Collector](cls: type[C]) -> type[C]:
+    """Register a collector, preserving its concrete type for callers."""
     REGISTRY[cls.name] = cls
     return cls
 

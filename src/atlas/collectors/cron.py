@@ -83,9 +83,11 @@ class CronCollector(Collector):
     def __init__(self) -> None:
         # Journal only covers a window; remember the newest run we ever saw
         # so staleness keeps growing while a job stays dark. (Per-host state:
-        # the scheduler builds one collector instance per host loop.)
+        # the scheduler builds one collector instance per host loop.) Seeded
+        # from persisted facts on first collect so a restart doesn't forget.
         self._last_runs: dict[str, float] = {}
         self._fail_streaks: dict[str, int] = {}
+        self._seeded: set[str] = set()
 
     async def collect(
         self, transport: Transport, host: HostConfig, ctx: HostContext
@@ -133,7 +135,36 @@ class CronCollector(Collector):
             redis_result = await transport.run(["sh", "-c", cmd], timeout=25)
             celery_jobs.extend(parse_celery_runs(redis_result.stdout))
 
+        await self._seed_last_runs(host.name, jobs, celery_jobs, ctx)
         return self._build_observation(host.name, jobs, runs, log_status, celery_jobs)
+
+    async def _seed_last_runs(
+        self,
+        host_name: str,
+        jobs: list[CronJob],
+        celery_jobs: list[tuple[CronJob, float | None, str | None]],
+        ctx: HostContext,
+    ) -> None:
+        """Re-hydrate remembered runs from the previous process's facts.
+
+        Without this a restart forgets every run, and any job whose last fire
+        has already aged out of the journal window can never repopulate it:
+        cron.last_run_ts and cron.overdue_ratio simply stop being written, the
+        last healthy ratio sits in the facts table forever, and cron_stale goes
+        on judging a number frozen at the moment the job went dark. Reading it
+        back only restores what we already observed, so a job we have genuinely
+        never seen run still stays unknown rather than becoming stale.
+        """
+        for job in [*jobs, *(j for j, _, _ in celery_jobs)]:
+            entity = f"cron:{host_name}/{job.slug}"
+            if entity in self._seeded:
+                continue
+            self._seeded.add(entity)
+            if entity in self._last_runs:
+                continue
+            stored = await ctx.fact(entity, "cron.last_run_ts")
+            if isinstance(stored, int | float) and not isinstance(stored, bool):
+                self._last_runs[entity] = float(stored)
 
     def _build_observation(
         self,
