@@ -46,3 +46,10 @@ async def test_dedupe_window() -> None:
     await notifier._on_incident(_event("opened", "critical"))
     await notifier._on_incident(_event("opened", "critical"))  # same key, within window
     assert len(sent) == 1
+
+
+async def test_reminder_is_sent_and_not_rate_limited() -> None:
+    notifier, sent = _notifier("critical")
+    await notifier._on_incident(_event("opened", "critical"))
+    await notifier._on_incident(_event("reminder", "critical"))  # same second
+    assert len(sent) == 2 and sent[1].startswith("🔴 ATLAS still open:")

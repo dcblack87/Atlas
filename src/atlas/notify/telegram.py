@@ -50,6 +50,8 @@ class TelegramNotifier:
             text = f"✅ ATLAS resolved: {event.title}"
         elif event.kind == "escalated":
             text = f"🔴 ATLAS escalated: {event.title}"
+        elif event.kind == "reminder":
+            text = f"🔴 ATLAS still open: {event.title}"
         else:
             return
 
@@ -57,7 +59,12 @@ class TelegramNotifier:
         now = time.time()
         if now - self._recent.get(key, 0) < DEDUPE_WINDOW_S:
             return
-        if now - self._last_sent < MIN_SECONDS_BETWEEN_ALERTS and event.kind != "opened":
+        # Opens and reminders are never rate-limited away: a reminder is already
+        # daily, and one dropped here would not come back for another 24h.
+        if now - self._last_sent < MIN_SECONDS_BETWEEN_ALERTS and event.kind not in (
+            "opened",
+            "reminder",
+        ):
             return
         self._recent[key] = now
         self._last_sent = now

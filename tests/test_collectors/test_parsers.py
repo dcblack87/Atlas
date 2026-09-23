@@ -249,6 +249,12 @@ class TestBackupLogStatus:
     def test_failed_after_success(self) -> None:
         assert parse_backup_log_status(_fixture("cron/backup-log-failed.txt")) == "failed"
 
+    def test_script_never_ran(self) -> None:
+        """Cron's own "Permission denied" after the last success is a failure —
+        the script never started, so it never logged an error of its own."""
+        text = _fixture("cron/backup-log-permission-denied.txt")
+        assert parse_backup_log_status(text) == "failed"
+
     def test_no_signal(self) -> None:
         assert parse_backup_log_status("") is None
         assert parse_backup_log_status("rotating logs\n") is None

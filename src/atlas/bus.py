@@ -42,7 +42,7 @@ class InventoryChanged:
 @dataclass(slots=True)
 class IncidentEvent:
     incident_id: int
-    kind: str  # opened | escalated | resolved | acked
+    kind: str  # opened | escalated | reminder | resolved | acked
     severity: str
     title: str
     entity: str
