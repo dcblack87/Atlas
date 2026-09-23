@@ -254,3 +254,23 @@ async def test_acked_and_warning_incidents_are_not_reminded(env) -> None:
     await db.execute("UPDATE incident_events SET ts = ts - 3 * 86400")
     await manager._remind_open()
     assert "reminder" not in [e.kind for e in events]
+
+
+async def test_fact_incident_clears_when_entity_goes_inactive(env) -> None:
+    """A renamed cron job's leftover overdue_ratio must not hold its incident open."""
+    db, _bus, manager, events = env
+    key = "cron:a/old-name"
+    await db.execute(
+        "INSERT INTO entities (kind, key, first_seen, last_seen) VALUES ('cron', ?, 0, 0)",
+        (key,),
+    )
+    await db.execute(
+        "INSERT INTO facts (entity_key, name, value, updated_at) VALUES (?, ?, ?, 0)",
+        (key, "cron.overdue_ratio", "9.0"),
+    )
+    await manager.evaluate_facts()
+    assert [e.kind for e in events] == ["opened"]
+
+    await db.execute("UPDATE entities SET active = 0 WHERE key = ?", (key,))
+    await manager.evaluate_facts()
+    assert [e.kind for e in events] == ["opened", "resolved"]

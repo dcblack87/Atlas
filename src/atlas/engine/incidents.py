@@ -108,8 +108,14 @@ class IncidentManager:
     async def evaluate_facts(self) -> None:
         """Judge fact rules against current facts (called by the sweep)."""
         for rule in FACT_RULES:
+            # Facts outlive their entity: a renamed or deleted cron job goes
+            # inactive, but its last overdue_ratio stays in the table and would
+            # hold its incident open forever. Judge only entities still present.
             rows = await self._db.fetch_all(
-                "SELECT entity_key, value FROM facts WHERE name = ?", (rule.fact,)
+                "SELECT f.entity_key, f.value FROM facts f WHERE f.name = ?"
+                " AND NOT EXISTS (SELECT 1 FROM entities e"
+                " WHERE e.key = f.entity_key AND e.active = 0)",
+                (rule.fact,),
             )
             for row in rows:
                 try:
