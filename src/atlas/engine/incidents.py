@@ -28,6 +28,10 @@ log = logging.getLogger(__name__)
 # considered cleared (collector intervals are <= 600s).
 ASSERTION_TTL_S = 1800
 SWEEP_INTERVAL_S = 60
+# A critical incident left open (not acked) is re-announced this often. One
+# alert and then silence let a dead backup sit unnoticed for 16 days (Sep 2026):
+# open/escalate/resolve are edges, and a condition that simply persists has none.
+REMIND_INTERVAL_S = 86400
 
 
 class IncidentManager:
@@ -178,11 +182,24 @@ class IncidentManager:
                 )
             )
 
+    async def _remind_open(self) -> None:
+        now = time.time()
+        for row in await self._store.due_reminders(REMIND_INTERVAL_S):
+            if self._is_suppressed(row["entity_key"]):
+                continue
+            days = int((now - row["opened_at"]) // 86400)
+            title = f"{row['title']} (open {days}d)" if days else row["title"]
+            await self._store.add_event(row["id"], "reminded", title)
+            await self._bus.publish(
+                IncidentEvent(row["id"], "reminder", row["severity"], title, row["entity_key"])
+            )
+
     # ── sweep ────────────────────────────────────────────────────────
 
     async def sweep(self) -> None:
         """Periodic housekeeping: fact rules + stale collector assertions."""
         await self.evaluate_facts()
+        await self._remind_open()
         now = time.time()
         collector_rules = {(f[0], f[1]) for f in self._last_asserted}
         for rule_id, entity in collector_rules:

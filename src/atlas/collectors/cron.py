@@ -44,6 +44,17 @@ FAIL_STREAK_CRITICAL = 3
 # daily job plus slack; weekly/monthly jobs rely on remembered state instead.
 JOURNAL_WINDOW = "-26h"
 
+# Newest journal line per distinct command, capped. A plain `tail -N` let a busy
+# host's */5 jobs push its daily ones out of the window: quotelab-prod logs ~2,700
+# CMD lines a day, so `tail -400` held ~10h and every daily job read as stale —
+# noise that buried a real backup outage for two weeks (Sep 2026). Only the
+# newest run per job matters, so dedupe on the command (pid and timestamp
+# stripped) newest-first; ~30 lines survive instead of thousands.
+_JOURNAL_NEWEST_PER_CMD = (
+    'tac | awk \'{k=$0; sub(/^[^ ]+ [^ ]+ CRON\\[[0-9]+\\]: /,"",k); '
+    "if(!(k in s)){s[k]=1; print}}' | head -400"
+)
+
 _SPECIALS = {
     "@hourly": 3600.0,
     "@daily": 86400.0,
@@ -98,7 +109,7 @@ class CronCollector(Collector):
             "; grep -H '' /etc/cron.d/* 2>/dev/null"
             f"; echo '{_SECTION}'"
             f"; journalctl SYSLOG_IDENTIFIER=CRON --since {JOURNAL_WINDOW} "
-            "-o short-unix --no-pager 2>/dev/null | grep -F 'CMD (' | tail -400"
+            f"-o short-unix --no-pager 2>/dev/null | grep -F 'CMD (' | {_JOURNAL_NEWEST_PER_CMD}"
         )
         result = await transport.run(["sh", "-c", script], timeout=30)
         crontab_text, crond_text, journal_text = _split_sections(result.stdout, 3)
@@ -516,7 +527,14 @@ def parse_backup_log_status(text: str) -> str | None:
         lowered = line.lower()
         if "backup complete" in lowered or "backup successful" in lowered:
             success_at = i
-        if re.search(r"\b(error|failed|fatal|abort)", lowered):
+        # Shell-level failures matter most: they mean the script never ran, so
+        # it never got to log its own error ("Permission denied" after a git pull
+        # dropped the exec bit hid a dead backup for two weeks, Sep 2026).
+        if re.search(
+            r"\b(error|failed|fatal|abort)|permission denied|command not found"
+            r"|no such file or directory|cannot execute",
+            lowered,
+        ):
             fail_at = i
     if fail_at > success_at:
         return "failed"

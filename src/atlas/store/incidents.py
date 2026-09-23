@@ -81,6 +81,25 @@ class IncidentStore:
         )
         return [dict(row) for row in rows]
 
+    async def due_reminders(self, quiet_s: int) -> list[dict[str, Any]]:
+        """Open (not acked) critical incidents nobody has been told about for quiet_s.
+
+        "Told" means an opened, escalated or reminded event — all persisted, so a
+        restart neither re-sends a reminder nor forgets one is owed.
+        """
+        rows = await self._db.fetch_all(
+            """
+            SELECT i.*, MAX(e.ts) AS last_notice_ts FROM incidents i
+            JOIN incident_events e
+              ON e.incident_id = i.id AND e.kind IN ('opened', 'escalated', 'reminded')
+            WHERE i.status = 'open' AND i.severity = 'critical'
+            GROUP BY i.id
+            HAVING MAX(e.ts) <= ?
+            """,
+            (int(time.time()) - quiet_s,),
+        )
+        return [dict(row) for row in rows]
+
     async def recent_incidents(self, since_s: int) -> list[dict[str, Any]]:
         rows = await self._db.fetch_all(
             "SELECT * FROM incidents WHERE opened_at >= ? ORDER BY opened_at DESC",

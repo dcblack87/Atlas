@@ -1,0 +1,30 @@
+[0;32m[backup][0m Cleaned up 2 expired backup(s), freed 6423536 bytes
+[0;32m[backup][0m Backup complete: bookingmachine_daily_20260907_030001.dump.enc (3447936 bytes, 843ms, verified=true)
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied
+/bin/sh: 1: /opt/bookingmachine/scripts/backup-db.sh: Permission denied

@@ -224,3 +224,33 @@ async def test_escalation_carries_detail(env) -> None:
         )
     incident = (await manager.store.open_incidents())[0]
     assert json.loads(incident["detail"])["streak"] == 3
+
+
+async def test_open_critical_is_reminded_daily(env) -> None:
+    """A critical left open gets re-announced once per quiet day, never per sweep."""
+    db, bus, manager, events = env
+    await bus.publish(FindingsEvent("a", "docker", [finding()]))
+    await manager._remind_open()
+    assert [e.kind for e in events] == ["opened"]  # just announced — nothing owed
+
+    # Age the incident and its opening notice past the reminder interval.
+    await db.execute("UPDATE incidents SET opened_at = opened_at - 3 * 86400")
+    await db.execute("UPDATE incident_events SET ts = ts - 3 * 86400")
+    await manager._remind_open()
+    assert [e.kind for e in events] == ["opened", "reminder"]
+    assert events[-1].title == "web is restarting (open 3d)"
+
+    await manager._remind_open()  # the reminder itself resets the clock
+    assert [e.kind for e in events] == ["opened", "reminder"]
+
+
+async def test_acked_and_warning_incidents_are_not_reminded(env) -> None:
+    db, bus, manager, events = env
+    await bus.publish(FindingsEvent("a", "docker", [finding(Severity.WARNING)]))
+    critical = Finding("host_down", "host:b", Severity.CRITICAL, "b is down")
+    await bus.publish(FindingsEvent("b", "ssh", [critical]))
+    acked = await manager.store.find_open("host_down", "host:b")
+    await manager.store.acknowledge(acked["id"])
+    await db.execute("UPDATE incident_events SET ts = ts - 3 * 86400")
+    await manager._remind_open()
+    assert "reminder" not in [e.kind for e in events]
