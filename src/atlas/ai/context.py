@@ -12,6 +12,7 @@ import json
 import time
 from datetime import datetime
 
+from atlas.redact import scrub
 from atlas.store.db import Database
 from atlas.store.incidents import IncidentStore
 from atlas.store.inventory import Inventory
@@ -147,7 +148,9 @@ class ContextBuilder:
             )
             sections.append("\n".join(lines))
 
-        text = "\n\n".join(sections)
+        # Facts and timeline bodies are whatever the fleet printed; this text
+        # leaves the machine, so credentials come out here whatever got stored.
+        text = scrub("\n\n".join(sections))
         if len(text) > MAX_CONTEXT_CHARS:
             text = text[:MAX_CONTEXT_CHARS] + "\n… [context truncated]"
         return text or "No data collected yet."
@@ -157,7 +160,7 @@ class ContextBuilder:
         if row is None:
             return f"incident {incident_id} not found"
         opened = datetime.fromtimestamp(row["opened_at"]).strftime("%Y-%m-%d %H:%M")
-        return (
+        return scrub(
             f"INCIDENT #{row['id']}\n"
             f"rule: {row['rule_id']}\nentity: {row['entity_key']}\n"
             f"severity: {row['severity']}  status: {row['status']}\n"

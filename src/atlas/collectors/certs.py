@@ -22,8 +22,8 @@ if TYPE_CHECKING:
 # grep silently returns nothing for those vhosts: no output, no error, no facts, no incident. A
 # certificate that is not discovered is not reported as missing, it is reported as nothing at all.
 #
-# Measured across the fleet before the change: web-1 0 of 4 certificates found,
-# example-prod 2 of 7, web-2 6 of 10 — including bookingapp's and exampleco's. The
+# Measured across a three-host fleet before the change: 0 of 4 certificates found on one host,
+# 2 of 7 on another, 6 of 10 on the third, the main production app's among the missing. The
 # `cert_expiry` rule (warn 21 days, crit 7) was therefore watching less than half of them, and on
 # one host nothing at all.
 _COMMAND = (

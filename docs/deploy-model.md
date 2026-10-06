@@ -13,11 +13,22 @@ preflight  →  typed confirm  →  stream  →  verify  →  audit
 - **Typed confirmation**: you type the app's name, exactly. The modal shows
   the host, path, sha delta, and the exact command. Esc aborts. The typed
   phrase is stored in the audit row.
-- **Execution**: one deploy at a time fleet-wide, streamed live into the UI,
-  hard timeout, full output captured (capped) in the audit trail.
+- **Execution**: one mutation at a time per host, streamed live into the UI,
+  hard timeout, full output captured (capped, credentials redacted) in the
+  audit trail. The lock is taken on the target host with `flock`, so it
+  holds even when two Atlas instances (say a laptop and the always-on
+  console) can reach the same server: the second attempt fails at once
+  rather than queueing. Each instance keeps its own audit trail, so pick one
+  to deploy from if you want a single history.
+- **Exit code**: the deploy command's real exit status is stored in the
+  audit row (124 for a timeout). A non-zero exit is shown in the stream and
+  on the timeline but does not page by itself.
 - **Verification** runs regardless of exit code: containers up, health
   endpoints answering, per-site checks for multi-site apps. A failed
-  verification opens a critical incident and pages you.
+  verification opens a critical incident and pages you. Verification
+  passing after a non-zero exit usually means the script died before
+  restarting anything and the previous version is still serving; Atlas
+  says so.
 - **Suppression**: incidents for the deploying app are suppressed during the
   deploy window plus a grace period. You should not be paged for your own
   deploy bouncing a health check.

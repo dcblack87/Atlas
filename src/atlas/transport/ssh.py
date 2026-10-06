@@ -18,7 +18,7 @@ from pathlib import Path
 import asyncssh
 
 from atlas.config import SSHSection
-from atlas.transport.base import HostUnreachable, Result
+from atlas.transport.base import CommandFailed, HostUnreachable, Result
 
 log = logging.getLogger(__name__)
 
@@ -111,9 +111,15 @@ class SSHTransport:
                     if not line:
                         break
                     yield line.rstrip("\n")
+                # EOF on stdout is not the exit status: wait for the channel to
+                # report it, still inside the caller's deadline.
+                await asyncio.wait_for(process.wait(), max(deadline - time.monotonic(), 1))
+                exit_status = process.exit_status
             finally:
                 process.terminate()
                 await process.wait_closed()
+        if exit_status != 0:
+            raise CommandFailed(self.host, exit_status if exit_status is not None else -1)
 
     async def close(self) -> None:
         if self._conn is not None and not self._conn.is_closed():

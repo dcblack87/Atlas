@@ -2,9 +2,10 @@
 
 from pathlib import Path
 
-from atlas.ai.bundles import scrub, write_bundle
+from atlas.ai.bundles import write_bundle
 from atlas.ai.context import ContextBuilder
 from atlas.demo.dataset import seed_demo
+from atlas.redact import scrub
 from atlas.store.db import Database
 
 
