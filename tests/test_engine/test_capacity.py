@@ -46,7 +46,7 @@ async def test_no_data_returns_none(env) -> None:
 
 async def test_site_capacity_ram_bound(env) -> None:
     inv, metrics = env
-    # a host like directorylab-1: ~2GB free, ~350MB/site
+    # a typical small host: ~2GB free, ~350MB/site
     await metrics.write(
         [
             Sample("mem.total_bytes", 4 * GB, "host:a"),

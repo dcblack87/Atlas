@@ -92,3 +92,26 @@ async def test_journal_wins_when_it_is_newer_than_the_stored_fact(ctx) -> None:
     obs = collector._build_observation("quotelab-prod", [job], {"database-backups": fresh}, {}, [])
 
     assert obs.facts[(entity, "cron.overdue_ratio")] < 1
+
+
+async def test_tokens_in_cron_commands_never_reach_the_facts(ctx) -> None:
+    """Cron lines carry bearer tokens; the facts table is read by people, the
+    Telegram bot, and the AI layer. The stored copy must not hold them."""
+    token = "0" * 64
+    job = CronJob(
+        name="Payment reminders",
+        slug="payment-reminders",
+        schedule="30 * * * *",
+        command=(
+            f"curl -sf -X POST -H 'Authorization: Bearer {token}' "
+            "http://127.0.0.1:3000/api/v1/cron/payment-reminders"
+        ),
+        source="crontab",
+        user="root",
+    )
+    obs = CronCollector()._build_observation("web-1", [job], {}, {}, [])
+
+    stored = repr(obs.facts)
+    assert token not in stored
+    assert "Bearer [redacted]" in obs.facts[("cron:web-1/payment-reminders", "cron.command")]
+    assert "payment-reminders" in obs.facts[("host:web-1", "cron.entries")][0]

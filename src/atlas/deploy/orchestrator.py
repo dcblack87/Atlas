@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import shlex
 import time
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
@@ -19,14 +20,21 @@ from atlas.bus import Bus, DeployEvent
 from atlas.config import AppConfig, Config, HostConfig
 from atlas.deploy.verify import verify_deploy
 from atlas.engine.incidents import IncidentManager
+from atlas.redact import scrub_secrets
 from atlas.store.audit import DeploymentStore
 from atlas.store.db import Database
 from atlas.store.inventory import Inventory
-from atlas.transport.base import Transport
+from atlas.transport.base import CommandFailed, Transport
 
 log = logging.getLogger(__name__)
 
 SUPPRESS_EXTRA_S = 120
+# Recorded when the hard timeout kills a deploy (the coreutils `timeout` convention).
+EXIT_TIMEOUT = 124
+# flock's exit status when another mutation already holds the host lock.
+EXIT_LOCKED = 75
+HOST_LOCK_DIR = "/run/lock"
+HOST_LOCK_NAME = "atlas-mutation.lock"
 
 
 class DeployError(Exception):
@@ -65,7 +73,10 @@ class DeployOrchestrator:
         self._incidents = incidents
         self._inventory = Inventory(db)
         self._audit = DeploymentStore(db)
-        self._lock = asyncio.Lock()  # one mutation at a time, fleet-wide
+        # One mutation at a time from this process. A second Atlas instance
+        # (a laptop beside the always-on console) has its own; what keeps the
+        # two apart is the lock taken on the target host, see _host_locked.
+        self._lock = asyncio.Lock()
 
     @property
     def audit(self) -> DeploymentStore:
@@ -166,12 +177,21 @@ class DeployOrchestrator:
             exit_code: int | None = None
             started = time.monotonic()
             try:
-                async for line in transport.stream(["sh", "-lc", command], timeout=timeout):
+                async for line in transport.stream(
+                    _host_locked(command, login=True), timeout=timeout
+                ):
                     output_lines.append(line)
                     await self._bus.publish(DeployEvent(deployment_id, app_name, "line", line))
                     yield line
                 exit_code = 0
+            except CommandFailed as e:
+                exit_code = e.exit_code
+                output_lines.append(f"✖ deploy command exited {e.exit_code}")
+                if e.exit_code == EXIT_LOCKED:
+                    output_lines[-1] += f" — {_LOCK_HELD_HINT.format(host=host.name)}"
+                yield output_lines[-1]
             except TimeoutError:
+                exit_code = EXIT_TIMEOUT
                 output_lines.append(f"✖ deploy timed out after {timeout:.0f}s — killed")
                 yield output_lines[-1]
             except Exception as e:
@@ -185,22 +205,33 @@ class DeployOrchestrator:
             result = await verify_deploy(transport, host, app_name, app, sites)
             for check_line in result.describe().splitlines():
                 yield check_line
+            if exit_code != 0 and result.passed:
+                # Health checks pass against whatever is running. A deploy that
+                # died before restarting anything leaves the old version up.
+                yield (
+                    f"⚠ the deploy command {_describe_exit(exit_code)} but verification "
+                    "passed — the previous version may still be serving"
+                )
 
             sha_after = await self._deployed_sha(transport, app)
             verify_status = "passed" if result.passed else "failed"
+            outcome = "✓" if result.passed else "✖ verification failed"
+            if exit_code != 0:
+                outcome += f" · deploy command {_describe_exit(exit_code)}"
             await self._audit.finish(
                 deployment_id,
                 exit_code=exit_code,
                 sha_after=sha_after,
-                output="\n".join(output_lines),
+                # Deploy scripts echo what they install, crontab lines and
+                # their tokens included. The live stream is yours to read; the
+                # stored copy is not the place to keep credentials.
+                output=scrub_secrets("\n".join(output_lines)),
                 verify_status=verify_status,
             )
             await self._incidents.store.add_event(
                 None,
                 "deploy",
-                f"deployed {app_name} "
-                f"{_short(sha_before)} → {_short(sha_after)} "
-                f"{'✓' if result.passed else '✖ verification failed'}",
+                f"deployed {app_name} {_short(sha_before)} → {_short(sha_after)} {outcome}",
             )
             await self._bus.publish(DeployEvent(deployment_id, app_name, "verified", verify_status))
             if not result.passed:
@@ -243,10 +274,16 @@ class DeployOrchestrator:
             )
             output: list[str] = []
             try:
-                async for line in transport.stream(["sh", "-c", command], timeout=300):
+                async for line in transport.stream(_host_locked(command, login=False), timeout=300):
                     output.append(line)
                     yield line
                 exit_code = 0
+            except CommandFailed as e:
+                output.append(f"✖ remediation exited {e.exit_code}")
+                if e.exit_code == EXIT_LOCKED:
+                    output[-1] += f" — {_LOCK_HELD_HINT.format(host=host_name)}"
+                yield output[-1]
+                exit_code = e.exit_code
             except Exception as e:
                 output.append(f"✖ remediation failed: {e}")
                 yield output[-1]
@@ -255,7 +292,7 @@ class DeployOrchestrator:
                 deployment_id,
                 exit_code=exit_code,
                 sha_after=None,
-                output="\n".join(output),
+                output=scrub_secrets("\n".join(output)),
                 verify_status="skipped",
             )
             await self._incidents.store.add_event(
@@ -265,6 +302,36 @@ class DeployOrchestrator:
 
 def _short(sha: str | None) -> str:
     return sha[:7] if sha else "unknown"
+
+
+_LOCK_HELD_HINT = "another mutation holds the lock on {host}, so nothing was run"
+
+
+def _host_locked(command: str, *, login: bool, lock_dir: str = HOST_LOCK_DIR) -> list[str]:
+    """Wrap a mutating command so only one runs per host at a time.
+
+    The lock lives on the target host, so it holds across Atlas instances.
+    It is non-blocking: a second mutation fails at once with EXIT_LOCKED
+    instead of queueing behind a deploy nobody is watching. ``-o`` closes the
+    lock before the command starts, so the lock is held by flock itself and is
+    released when the command exits, whatever it leaves running. Hosts without
+    flock (it ships with util-linux) run the command unwrapped.
+    """
+    script = (
+        "if command -v flock >/dev/null 2>&1; then "
+        f'd={shlex.quote(lock_dir)}; [ -w "$d" ] || d=/tmp; '
+        f'exec flock -n -E {EXIT_LOCKED} -o "$d/{HOST_LOCK_NAME}" sh -c "$0"; '
+        'else exec sh -c "$0"; fi'
+    )
+    return ["sh", "-lc" if login else "-c", script, command]
+
+
+def _describe_exit(exit_code: int | None) -> str:
+    if exit_code is None:
+        return "did not finish"
+    if exit_code == EXIT_TIMEOUT:
+        return "timed out"
+    return f"exited {exit_code}"
 
 
 def _is_sha(text: str) -> bool:

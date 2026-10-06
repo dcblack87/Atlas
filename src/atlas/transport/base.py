@@ -22,6 +22,20 @@ class HostUnreachable(Exception):
         self.reason = reason
 
 
+class CommandFailed(Exception):
+    """A streamed command ran to completion and exited non-zero.
+
+    Raised by ``stream()`` after the last line has been yielded, so the caller
+    has the whole output before it learns the verdict. ``exit_code`` is -1 when
+    the process ended without reporting one (killed by a signal).
+    """
+
+    def __init__(self, host: str, exit_code: int) -> None:
+        super().__init__(f"{host}: command exited {exit_code}")
+        self.host = host
+        self.exit_code = exit_code
+
+
 class Result(NamedTuple):
     exit_code: int
     stdout: str
@@ -42,5 +56,9 @@ class Transport(Protocol):
         ...
 
     def stream(self, cmd: list[str], *, timeout: float = 900) -> AsyncIterator[str]:
-        """Run a command and yield merged stdout/stderr line by line."""
+        """Run a command and yield merged stdout/stderr line by line.
+
+        Raises ``CommandFailed`` once the output is exhausted if the command
+        exited non-zero.
+        """
         ...

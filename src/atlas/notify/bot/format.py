@@ -1,4 +1,4 @@
-"""Card formatting for the Telegram bot — the BookingMachine house style.
+"""Card formatting for the Telegram bot — one house style for every card.
 
 HTML parse mode; emoji header + bold title, blank line, ``Label: <b>value</b>``
 rows; <code> for timestamps and ids. Escape only ``& < >``.

@@ -10,7 +10,7 @@ import asyncio
 import time
 from collections.abc import AsyncIterator
 
-from atlas.transport.base import Result
+from atlas.transport.base import CommandFailed, Result
 
 
 class LocalTransport:
@@ -54,7 +54,12 @@ class LocalTransport:
                 if not line:
                     break
                 yield line.decode(errors="replace").rstrip("\n")
+            # EOF on stdout is not the exit status: wait for it, still inside
+            # the caller's deadline.
+            returncode = await asyncio.wait_for(proc.wait(), max(deadline - time.monotonic(), 1))
         finally:
             if proc.returncode is None:
                 proc.kill()
             await proc.wait()
+        if returncode != 0:
+            raise CommandFailed(self.host, returncode)

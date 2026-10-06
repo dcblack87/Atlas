@@ -32,6 +32,11 @@ SWEEP_INTERVAL_S = 60
 # alert and then silence let a dead backup sit unnoticed for 16 days (Sep 2026):
 # open/escalate/resolve are edges, and a condition that simply persists has none.
 REMIND_INTERVAL_S = 86400
+# An incident whose entity has left the inventory can never clear by itself:
+# nothing probes a site that was moved or a container that was removed, so no
+# good sample ever arrives. The grace period keeps a discovery hiccup from
+# resolving something real.
+ORPHAN_GRACE_S = 6 * 3600
 
 
 class IncidentManager:
@@ -188,6 +193,17 @@ class IncidentManager:
                 )
             )
 
+    async def _resolve_orphaned(self) -> None:
+        rows = await self._db.fetch_all(
+            "SELECT i.rule_id, i.entity_key FROM incidents i"
+            " JOIN entities e ON e.key = i.entity_key"
+            " WHERE i.status != 'resolved' AND e.active = 0 AND e.last_seen < ?",
+            (int(time.time()) - ORPHAN_GRACE_S,),
+        )
+        for row in rows:
+            await self._clear(row["rule_id"], row["entity_key"])
+            self._last_asserted.pop((row["rule_id"], row["entity_key"]), None)
+
     async def _remind_open(self) -> None:
         now = time.time()
         for row in await self._store.due_reminders(REMIND_INTERVAL_S):
@@ -205,6 +221,7 @@ class IncidentManager:
     async def sweep(self) -> None:
         """Periodic housekeeping: fact rules + stale collector assertions."""
         await self.evaluate_facts()
+        await self._resolve_orphaned()
         await self._remind_open()
         now = time.time()
         collector_rules = {(f[0], f[1]) for f in self._last_asserted}

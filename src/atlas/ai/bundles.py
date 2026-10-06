@@ -6,28 +6,14 @@ gitignored bundles/ directory; secret-shaped strings are scrubbed.
 
 from __future__ import annotations
 
-import re
 import time
 from datetime import datetime
 from pathlib import Path
 
 from atlas.ai.context import ContextBuilder
+from atlas.redact import scrub
 
 BUNDLES_DIR = Path("bundles")
-
-# Long high-entropy tokens, key=value secrets, URL credentials, PEM blocks.
-_SECRETY = re.compile(
-    r"(?:(?:api[_-]?key|token|secret|password|passwd)\s*[=:]\s*)\S+"
-    r"|[a-z][a-z0-9+.-]*://[^\s@/]+:[^\s@]+@"  # scheme://user:pass@
-    r"|sk-[A-Za-z0-9_-]{20,}"
-    r"|-----BEGIN [A-Z ]+PRIVATE KEY-----[\s\S]+?-----END [A-Z ]+PRIVATE KEY-----"
-    r"|\b[A-Za-z0-9+/_-]{40,}\b",
-    re.IGNORECASE,
-)
-
-
-def scrub(text: str) -> str:
-    return _SECRETY.sub("[redacted]", text)
 
 
 async def write_bundle(context: ContextBuilder, app: str | None = None) -> Path:

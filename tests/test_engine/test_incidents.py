@@ -8,7 +8,7 @@ import pytest
 from atlas.bus import Bus, FindingsEvent, IncidentEvent, SamplesEvent
 from atlas.engine.health import health_scores
 from atlas.engine.incidents import IncidentManager
-from atlas.model import Finding, Sample, Severity
+from atlas.model import Entity, EntityKind, Finding, Sample, Severity
 from atlas.store.db import Database
 from atlas.store.inventory import Inventory
 from atlas.store.metrics import Metrics
@@ -97,12 +97,12 @@ async def test_http_blip_does_not_open_incident(env) -> None:
     """One failed probe (curl blip under load) must not page anyone."""
     db, bus, manager, events = env
     metrics = Metrics(db)
-    entity = "site:directorylab/mobiledetailing"
+    entity = "site:sitefarm/acmedetailing"
 
     async def probe(value: float) -> None:
         samples = [Sample("http.up", value, entity)]
         await metrics.write(samples)
-        await bus.publish(SamplesEvent("directorylab-1", "http_health", samples))
+        await bus.publish(SamplesEvent("web-1", "http_health", samples))
 
     await probe(1.0)
     await probe(0.0)  # the blip
@@ -114,12 +114,12 @@ async def test_http_blip_does_not_open_incident(env) -> None:
 async def test_http_down_opens_after_two_probes_and_resolves_fast(env) -> None:
     db, bus, manager, events = env
     metrics = Metrics(db)
-    entity = "site:directorylab/mobiledetailing"
+    entity = "site:sitefarm/acmedetailing"
 
     async def probe(value: float) -> None:
         samples = [Sample("http.up", value, entity)]
         await metrics.write(samples)
-        await bus.publish(SamplesEvent("directorylab-1", "http_health", samples))
+        await bus.publish(SamplesEvent("web-1", "http_health", samples))
 
     await probe(0.0)
     await probe(0.0)
@@ -138,10 +138,10 @@ async def test_legacy_health_down_clears_on_good_probe(env) -> None:
     a good http.up sample arrives (covers open incidents across an upgrade)."""
     db, bus, manager, _events = env
     metrics = Metrics(db)
-    entity = "site:directorylab/mobiledetailing"
+    entity = "site:sitefarm/acmedetailing"
     await bus.publish(
         FindingsEvent(
-            "directorylab-1",
+            "web-1",
             "http_health",
             [Finding("health_down", entity, Severity.CRITICAL, "not answering (HTTP 000)")],
         )
@@ -150,8 +150,48 @@ async def test_legacy_health_down_clears_on_good_probe(env) -> None:
 
     samples = [Sample("http.up", 1.0, entity)]
     await metrics.write(samples)
-    await bus.publish(SamplesEvent("directorylab-1", "http_health", samples))
+    await bus.publish(SamplesEvent("web-1", "http_health", samples))
     assert await manager.store.open_incidents() == []
+
+
+async def _open_http_down_on_removed_site(db, bus, *, last_seen_age_s: int) -> str:
+    """A site goes down, then leaves the inventory (moved to another host)."""
+    entity = "site:sitefarm/acme"
+    inventory = Inventory(db)
+    metrics = Metrics(db)
+    await inventory.sync(
+        ["app:sitefarm"], ["site"], [Entity(EntityKind.SITE, entity, parent="app:sitefarm")]
+    )
+    for _ in range(2):
+        samples = [Sample("http.up", 0.0, entity)]
+        await metrics.write(samples)
+        await bus.publish(SamplesEvent("web-1", "http_health", samples))
+    await inventory.sync(["app:sitefarm"], ["site"], [])
+    await db.execute(
+        "UPDATE entities SET last_seen = last_seen - ? WHERE key = ?", (last_seen_age_s, entity)
+    )
+    return entity
+
+
+async def test_incident_on_removed_entity_resolves(env) -> None:
+    """No probe ever reaches a site that is gone, so no good sample can clear
+    its incident. Without this it stays open, and paging, forever."""
+    db, bus, manager, events = env
+    await _open_http_down_on_removed_site(db, bus, last_seen_age_s=7 * 3600)
+    assert len(await manager.store.open_incidents()) == 1
+
+    await manager.sweep()
+    assert await manager.store.open_incidents() == []
+    assert [e.kind for e in events] == ["opened", "resolved"]
+
+
+async def test_incident_on_recently_vanished_entity_stays_open(env) -> None:
+    """A discovery hiccup must not resolve a real outage."""
+    db, bus, manager, _events = env
+    await _open_http_down_on_removed_site(db, bus, last_seen_age_s=600)
+
+    await manager.sweep()
+    assert len(await manager.store.open_incidents()) == 1
 
 
 async def test_host_down_recovers_on_host_up(env) -> None:
@@ -182,7 +222,7 @@ async def test_host_down_recovers_on_host_up(env) -> None:
 async def test_open_incident_tracks_the_current_value(env) -> None:
     """An open incident quotes now, not whatever opened it.
 
-    Reproduces the bookingmachine case: opened at 30.3h, escalated at 54.2h,
+    Reproduces a real case: opened at 30.3h, escalated at 54.2h,
     and the stored detail was still saying 30.3 two days later while the
     title said 54.2 and the fact itself had reached 58.1.
     """

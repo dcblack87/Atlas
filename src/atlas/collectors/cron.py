@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 from atlas.collectors.base import Collector, register
 from atlas.config import HostConfig
 from atlas.model import Entity, EntityKind, Finding, Observation, Sample, Severity
+from atlas.redact import scrub_secrets
 from atlas.transport.base import Transport
 
 if TYPE_CHECKING:
@@ -45,7 +46,7 @@ FAIL_STREAK_CRITICAL = 3
 JOURNAL_WINDOW = "-26h"
 
 # Newest journal line per distinct command, capped. A plain `tail -N` let a busy
-# host's */5 jobs push its daily ones out of the window: quotelab-prod logs ~2,700
+# host's */5 jobs push its daily ones out of the window: one production host logs ~2,700
 # CMD lines a day, so `tail -400` held ~10h and every daily job read as stale —
 # noise that buried a real backup outage for two weeks (Sep 2026). Only the
 # newest run per job matters, so dedupe on the command (pid and timestamp
@@ -205,7 +206,10 @@ class CronCollector(Collector):
                 )
             )
             obs.facts[(entity, "cron.schedule")] = job.schedule
-            obs.facts[(entity, "cron.command")] = job.command[:200]
+            # Cron lines routinely carry a bearer token for the endpoint they
+            # call. Matching against the journal uses job.command itself; what
+            # is stored only ever gets read by people and the AI layer.
+            obs.facts[(entity, "cron.command")] = scrub_secrets(job.command)[:200]
             obs.facts[(entity, "cron.source")] = job.source
             obs.facts[(entity, "cron.user")] = job.user
 
@@ -226,6 +230,7 @@ class CronCollector(Collector):
 
             status: str | None = None
             if error:
+                error = scrub_secrets(error)
                 status = "failed"
                 obs.facts[(entity, "cron.last_error")] = error[:300]
             else:
@@ -257,7 +262,7 @@ class CronCollector(Collector):
 
         obs.samples.append(Sample("cron.entries", float(len(all_jobs)), host_entity))
         obs.facts[(host_entity, "cron.entries")] = [
-            f"{job.schedule}  {job.command}"[:160] for job, _, _ in all_jobs[:50]
+            scrub_secrets(f"{job.schedule}  {job.command}")[:160] for job, _, _ in all_jobs[:50]
         ]
         return obs
 
@@ -371,7 +376,7 @@ def _name_from_comment(comment: str | None) -> str | None:
     if comment is None:
         return None
     text = comment.lstrip("#").strip()
-    # Drop trailing inline markers ("... # bookingmachine-cron").
+    # Drop trailing inline markers ("... # shopfront-cron").
     text = text.split(" # ")[0].strip()
     # "Recurring Bookings — daily at 6:00 AM UTC" -> "Recurring Bookings"
     text = text.split(" — ")[0].strip()

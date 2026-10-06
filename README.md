@@ -113,7 +113,8 @@ coalesced refresh, `glance` for huge tiles readable across a desk.
 - **Audited deploys**: preflight sha comparison, a typed-confirmation gate,
   streamed output, hard timeout, post-deploy verification of every
   container and endpoint (every *site* for multi-tenant apps), guided
-  rollback, and a full audit trail. One fleet-wide mutation lock.
+  rollback, and a full audit trail. One mutation at a time per host,
+  enforced on the host itself.
 - **Deploy drift on the dashboard**: deployed sha vs origin/main via the
   GitHub API. A pending deploy is a tile on the front screen, not a fact
   you discover by SSHing in.
@@ -135,7 +136,7 @@ coalesced refresh, `glance` for huge tiles readable across a desk.
   not a convention.
 - **Every mutation is gated**: typed confirmation phrase (stored in the
   audit row), allowlisted remediation templates, sanitised parameters,
-  fleet-wide lock, hard timeout.
+  per-host lock, hard timeout.
 - **No cloud credentials needed** beyond read-only billing tokens. SSH uses
   a dedicated key over your tailnet with trust-on-first-use host pinning.
 - **Secrets never reach git**: real inventory lives in a gitignored
