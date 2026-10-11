@@ -91,6 +91,8 @@ class TelegramSection(BaseModel):
     chat_id: str | None = None
     min_severity: Literal["critical", "warning"] = "critical"
     bot_commands: bool = True  # answer /status etc. via long polling
+    daily_brief: bool = True  # send the 07:00 morning brief to the chat
+    weekly_brief: bool = True  # and the Sunday 08:00 weekly one
 
     def resolve_token(self) -> str | None:
         return os.environ.get("ATLAS_TELEGRAM_TOKEN") or self.bot_token

@@ -91,6 +91,8 @@ enabled = false
 # chat_id = "..."                 # leave unset, send the bot /start, it replies with the id
 # min_severity = "critical"       # "critical" (default) or "warning"
 # bot_commands = true             # answer /status, /backups, /crons ... via long polling
+# daily_brief = true              # send the 07:00 morning brief to the chat
+# weekly_brief = true             # and the Sunday 08:00 weekly brief
 
 # ── Costs (optional) ─────────────────────────────────────────────────
 # Read-only Hetzner Cloud API tokens, one per project. Atlas only ever GETs.
