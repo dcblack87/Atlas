@@ -84,7 +84,8 @@ away.
 **Incidents** come from a declarative rule table with hysteresis (no
 flapping), auto-resolve, and health scores. The timeline interleaves
 deploys and inventory drift with incidents, because "what changed?" is
-always the first question. Telegram pages you for critical only.
+always the first question. Telegram pages you for critical only, and
+answers from a menu when you ask ([docs/telegram.md](docs/telegram.md)).
 
 ![Incidents screen](docs/screenshots/incidents.svg)
 

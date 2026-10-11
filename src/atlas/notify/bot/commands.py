@@ -1,8 +1,13 @@
 """Bot commands — every card reads the same store the TUI screens read.
 
-Registry pattern: ``COMMANDS`` maps a slash-command name to a description
-(for Telegram's command menu) and a handler. Callback buttons carry
-``cmd:<name>`` and route straight back through the same registry.
+Registry pattern: ``COMMANDS`` maps a name to a description (for Telegram's
+command menu) and a handler. Buttons carry ``cmd:<name>[:<arg>…]`` and route
+straight back through the same registry, so a typed command and a tap cannot
+drift apart. A command with ``listed=False`` is reached only from a button.
+
+Everything here reads, with one exception: acknowledging an incident, which
+the TUI also does with one key. It asks first (``ack``) and then does it
+(``ack_go``). Deploys stay in the TUI, where they are audited.
 """
 
 from __future__ import annotations
@@ -18,7 +23,11 @@ from atlas.notify.bot.format import (
     button,
     card,
     esc,
+    footer,
     menu_button,
+    page_note,
+    pager,
+    paginate,
     truncate,
     when,
 )
@@ -26,26 +35,32 @@ from atlas.notify.bot.format import (
 if TYPE_CHECKING:
     from atlas.runtime import Runtime
 
-Handler = Callable[["Runtime"], Coroutine[Any, Any, BotResponse]]
+Handler = Callable[["Runtime", list[str]], Coroutine[Any, Any, BotResponse]]
 
 GLYPH = {"ok": "✅", "warn": "⚠️", "crit": "❌", "unknown": "·"}
+
+INCIDENTS_PER_PAGE = 8
+ROWS_PER_PAGE = 12
 
 
 @dataclass(frozen=True, slots=True)
 class Command:
     description: str
     handler: Handler
+    listed: bool = True  # False: a button's target, not a typed command
 
 
 async def process(rt: Runtime, text: str) -> BotResponse | None:
-    """Dispatch a message or ``cmd:<key>`` callback. None = not for us."""
+    """Dispatch a message or a ``cmd:<key>[:<arg>…]`` callback. None = not for us."""
     text = text.strip()
     if text.startswith("cmd:"):
-        text = "/" + text[4:]
-    if not text.startswith("/"):
+        name, *args = text[4:].split(":")
+    elif text.startswith("/"):
+        first, *args = text.split()
+        name = first[1:].lower().split("@")[0]
+    else:
         return None
-    name = text.split()[0][1:].lower().split("@")[0]
-    if name == "start":
+    if name in ("start", "menu"):
         name = "help"
     entry = COMMANDS.get(name)
     if entry is None:
@@ -54,7 +69,7 @@ async def process(rt: Runtime, text: str) -> BotResponse | None:
             [[menu_button()]],
         )
     try:
-        return await entry.handler(rt)
+        return await entry.handler(rt, args)
     except Exception as e:  # a broken card must never kill the poller
         return BotResponse(f"❌ Command failed: {esc(str(e))}", [[menu_button()]])
 
@@ -64,16 +79,36 @@ def bot_command_list() -> list[dict]:
     return [
         {"command": name, "description": cmd.description[:256]}
         for name, cmd in COMMANDS.items()
-        if name != "help"
+        if cmd.listed and name != "help"
     ] + [{"command": "help", "description": COMMANDS["help"].description[:256]}]
 
 
 # ── handlers ─────────────────────────────────────────────────────────────
 
 
-async def handle_help(rt: Runtime) -> BotResponse:
+async def handle_help(rt: Runtime, args: list[str]) -> BotResponse:
+    """The menu, with the headline on it: nothing to tap to learn the fleet is fine."""
+    from atlas.engine.health import health_scores
+
+    scores = await health_scores(rt.incidents.store)
+    fleet = scores.get("fleet", 100)
+    open_incidents = await rt.incidents.store.open_incidents()
+    critical = sum(1 for i in open_incidents if i["severity"] == "critical")
+    pending = await _pending_deploys(rt)
+    glyph = "✅" if fleet >= 90 else "⚠️" if fleet >= 60 else "❌"
+    lines = [
+        f"{glyph} Health <b>{fleet}/100</b>",
+        (
+            f"🚨 <b>{len(open_incidents)}</b> open incidents"
+            + (f" · <b>{critical}</b> critical" if critical else "")
+            if open_incidents
+            else "🟢 No open incidents"
+        ),
+    ]
+    if pending:
+        lines.append(f"🚀 <b>{len(pending)}</b> apps with commits waiting")
     return BotResponse(
-        "🧭 <b>Atlas Ops</b>\n\nTap a button or type a command.",
+        card("🧭", "Atlas Ops", lines),
         [
             [button("📊 Status", "status"), button("📰 Digest", "digest")],
             [
@@ -86,11 +121,12 @@ async def handle_help(rt: Runtime) -> BotResponse:
                 button("📦 Apps", "apps"),
                 button("🚀 Deploys", "deploys"),
             ],
+            [button("↻ Refresh", "help")],
         ],
     )
 
 
-async def handle_status(rt: Runtime) -> BotResponse:
+async def handle_status(rt: Runtime, args: list[str]) -> BotResponse:
     from atlas.engine.health import health_scores
 
     scores = await health_scores(rt.incidents.store)
@@ -116,33 +152,131 @@ async def handle_status(rt: Runtime) -> BotResponse:
     ]
     return BotResponse(
         card("📊", "Fleet status", lines),
-        [[button("🚨 Incidents", "incidents"), button("🖥 Hosts", "hosts"), menu_button()]],
+        [[button("🚨 Incidents", "incidents"), button("🖥 Hosts", "hosts")], footer("status")],
     )
 
 
-async def handle_incidents(rt: Runtime) -> BotResponse:
+async def handle_incidents(rt: Runtime, args: list[str]) -> BotResponse:
     incidents = await rt.incidents.store.open_incidents()
     if not incidents:
         return BotResponse(
             card("🟢", "No open incidents", ["Fleet is quiet."]),
-            [[button("📊 Status", "status"), menu_button()]],
+            [[button("📊 Status", "status")], footer("incidents")],
         )
+    shown, page, pages = paginate(incidents, args, INCIDENTS_PER_PAGE)
+    first = page * INCIDENTS_PER_PAGE
     lines = []
-    for incident in incidents[:10]:
+    for number, incident in enumerate(shown, start=first + 1):
         glyph = "❌" if incident["severity"] == "critical" else "⚠️"
+        acked = " · acked" if incident["status"] == "acked" else ""
         lines.append(
-            f"{glyph} {esc(truncate(incident['title'], 90))}\n"
-            f"    <code>{esc(incident['entity_key'])}</code> · {ago(incident['opened_at'])}"
+            f"{number}. {glyph} {esc(truncate(incident['title'], 90))}\n"
+            f"    <code>{esc(incident['entity_key'])}</code> · {ago(incident['opened_at'])}{acked}"
         )
-    if len(incidents) > 10:
-        lines.append(f"<i>… and {len(incidents) - 10} more</i>")
+    lines.append("")
+    lines.append("<i>Tap a number to open that incident.</i>")
+    lines.extend(page_note(page, pages))
+    numbers = [
+        button(str(number), "incident", incident["id"])
+        for number, incident in enumerate(shown, start=first + 1)
+    ]
     return BotResponse(
         card("🚨", f"Open incidents ({len(incidents)})", lines),
-        [[button("📊 Status", "status"), menu_button()]],
+        [
+            numbers[:4],
+            numbers[4:],
+            pager("incidents", page, pages),
+            [button("📊 Status", "status")],
+            footer("incidents", page),
+        ],
     )
 
 
-async def handle_backups(rt: Runtime) -> BotResponse:
+def _incident_id(args: list[str]) -> int | None:
+    return int(args[0]) if args and args[0].isdigit() else None
+
+
+async def _incident_card(rt: Runtime, incident: dict, toast: str | None = None) -> BotResponse:
+    glyph = "❌" if incident["severity"] == "critical" else "⚠️"
+    status = {"open": "open", "acked": "acknowledged", "resolved": "resolved"}.get(
+        incident["status"], incident["status"]
+    )
+    events = await rt.db.fetch_all(
+        "SELECT ts, kind, body FROM incident_events WHERE incident_id = ? ORDER BY ts DESC LIMIT 5",
+        (incident["id"],),
+    )
+    lines = [
+        f"<code>{esc(incident['entity_key'])}</code>",
+        f"{incident['severity']} · {status} · opened {ago(incident['opened_at'])}",
+    ]
+    if events:
+        lines.append("")
+        lines.extend(
+            f"· {esc(event['kind'])} {ago(event['ts'])}: {esc(truncate(event['body'], 80))}"
+            for event in events
+        )
+    keyboard = [
+        [button("✓ Acknowledge", "ack", incident["id"])] if incident["status"] == "open" else [],
+        [button("« Incidents", "incidents")],
+        footer("incident", incident["id"]),
+    ]
+    return BotResponse(card(glyph, truncate(incident["title"], 200), lines), keyboard, toast=toast)
+
+
+def _no_incident() -> BotResponse:
+    return BotResponse(
+        card("🚨", "Incident", ["That incident is not on file any more."]),
+        [[button("« Incidents", "incidents"), menu_button()]],
+    )
+
+
+async def handle_incident(rt: Runtime, args: list[str]) -> BotResponse:
+    incident_id = _incident_id(args)
+    incident = await rt.incidents.store.get(incident_id) if incident_id is not None else None
+    return await _incident_card(rt, incident) if incident else _no_incident()
+
+
+async def handle_ack(rt: Runtime, args: list[str]) -> BotResponse:
+    """The question before anything changes."""
+    incident_id = _incident_id(args)
+    incident = await rt.incidents.store.get(incident_id) if incident_id is not None else None
+    if incident is None:
+        return _no_incident()
+    if incident["status"] != "open":
+        return await _incident_card(rt, incident, toast=f"Already {incident['status']}.")
+    return BotResponse(
+        card(
+            "✓",
+            "Acknowledge this incident?",
+            [
+                esc(truncate(incident["title"], 200)),
+                "",
+                "The daily reminder stops. It stays on the list until the condition clears.",
+            ],
+        ),
+        [
+            [
+                button("Yes, acknowledge", "ack_go", incident["id"]),
+                button("Cancel", "incident", incident["id"]),
+            ],
+            [menu_button()],
+        ],
+    )
+
+
+async def handle_ack_go(rt: Runtime, args: list[str]) -> BotResponse:
+    incident_id = _incident_id(args)
+    incident = await rt.incidents.store.get(incident_id) if incident_id is not None else None
+    if incident is None:
+        return _no_incident()
+    if incident["status"] != "open":  # a second tap, or it cleared meanwhile
+        return await _incident_card(rt, incident, toast=f"Already {incident['status']}.")
+    await rt.incidents.store.acknowledge(incident["id"])
+    fresh = await rt.incidents.store.get(incident["id"])
+    return await _incident_card(rt, fresh or incident, toast="Acknowledged. Reminders stop.")
+
+
+async def handle_backups(rt: Runtime, args: list[str]) -> BotResponse:
     apps = await rt.inventory.entities(kind="app")
     lines = []
     stale = 0
@@ -160,19 +294,20 @@ async def handle_backups(rt: Runtime) -> BotResponse:
             stale += 1
         date = f" · <code>{when(ts)}</code>" if isinstance(ts, int | float) else ""
         lines.append(f"{glyph} {esc(name)}: <b>{age:.1f}h ago</b>{date}")
-    footer = "All fresh." if not stale else f"{stale} need attention."
+    summary = "All fresh." if not stale else f"{stale} need attention."
+    shown, page, pages = paginate(lines, args, ROWS_PER_PAGE)
     return BotResponse(
-        card("💾", "Backups", [*lines, "", f"<i>{footer}</i>"]),
-        [[button("📦 Apps", "apps"), menu_button()]],
+        card("💾", "Backups", [*shown, "", f"<i>{summary}</i>", *page_note(page, pages)]),
+        [pager("backups", page, pages), [button("📦 Apps", "apps")], footer("backups", page)],
     )
 
 
-async def handle_crons(rt: Runtime) -> BotResponse:
+async def handle_crons(rt: Runtime, args: list[str]) -> BotResponse:
     jobs = await rt.inventory.entities(kind="cron")
     if not jobs:
         return BotResponse(
             card("⏰", "Cron jobs", ["No cron jobs discovered yet."]),
-            [[menu_button()]],
+            [footer("crons")],
         )
     rows = []
     for job in jobs:
@@ -186,22 +321,29 @@ async def handle_crons(rt: Runtime) -> BotResponse:
     weight = {"failed": 0, "late": 1, "unknown": 2, "ok": 3}
     rows.sort(key=lambda r: (weight[r[0]], r[1], r[2]))
     glyphs = {"failed": "❌", "late": "⚠️", "ok": "✅", "unknown": "·"}
+    shown, page, pages = paginate(rows, args, ROWS_PER_PAGE)
     lines = []
-    for status, host, name, last_run in rows[:12]:
+    for status, host, name, last_run in shown:
         run = ago(last_run) if isinstance(last_run, int | float) else "never seen"
         lines.append(f"{glyphs[status]} {esc(truncate(name, 34))} · {esc(host)} · {run}")
-    if len(rows) > 12:
-        lines.append(f"<i>… and {len(rows) - 12} more</i>")
     failed = sum(1 for r in rows if r[0] == "failed")
     late = sum(1 for r in rows if r[0] == "late")
     summary = "All healthy." if not failed and not late else f"{failed} failing, {late} late."
     return BotResponse(
-        card("⏰", f"Cron jobs ({len(rows)})", [*lines, "", f"<i>{summary}</i>"]),
-        [[button("🚨 Incidents", "incidents"), menu_button()]],
+        card(
+            "⏰",
+            f"Cron jobs ({len(rows)})",
+            [*lines, "", f"<i>{summary}</i>", *page_note(page, pages)],
+        ),
+        [
+            pager("crons", page, pages),
+            [button("🚨 Incidents", "incidents")],
+            footer("crons", page),
+        ],
     )
 
 
-async def handle_hosts(rt: Runtime) -> BotResponse:
+async def handle_hosts(rt: Runtime, args: list[str]) -> BotResponse:
     hosts = await rt.inventory.entities(kind="host")
     lines = []
     for host in sorted(hosts, key=lambda h: h["key"]):
@@ -219,13 +361,14 @@ async def handle_hosts(rt: Runtime) -> BotResponse:
             f"{glyph} <b>{esc(name)}</b> — load {_num(load)} · "
             f"mem {_num(mem)}% · disk {_num(disk)}%"
         )
+    shown, page, pages = paginate(lines, args, ROWS_PER_PAGE)
     return BotResponse(
-        card("🖥", "Hosts", lines),
-        [[button("📊 Status", "status"), menu_button()]],
+        card("🖥", f"Hosts ({len(lines)})", [*shown, *page_note(page, pages)]),
+        [pager("hosts", page, pages), [button("📊 Status", "status")], footer("hosts", page)],
     )
 
 
-async def handle_apps(rt: Runtime) -> BotResponse:
+async def handle_apps(rt: Runtime, args: list[str]) -> BotResponse:
     apps = await rt.inventory.entities(kind="app")
     lines = []
     for app in sorted(apps, key=lambda a: a["key"]):
@@ -238,29 +381,34 @@ async def handle_apps(rt: Runtime) -> BotResponse:
         sites = await rt.inventory.entities(kind="site", parent=app["key"])
         site_note = f" · {len(sites)} sites" if sites else ""
         lines.append(f"{glyph} <b>{esc(name)}</b>{latency}{site_note}")
+    shown, page, pages = paginate(lines, args, ROWS_PER_PAGE)
     return BotResponse(
-        card("📦", "Apps", lines),
-        [[button("💾 Backups", "backups"), button("🚀 Deploys", "deploys"), menu_button()]],
+        card("📦", f"Apps ({len(lines)})", [*shown, *page_note(page, pages)]),
+        [
+            pager("apps", page, pages),
+            [button("💾 Backups", "backups"), button("🚀 Deploys", "deploys")],
+            footer("apps", page),
+        ],
     )
 
 
-async def handle_deploys(rt: Runtime) -> BotResponse:
+async def handle_deploys(rt: Runtime, args: list[str]) -> BotResponse:
     pending = await _pending_deploys(rt)
     if not pending:
         return BotResponse(
             card("🚀", "Deploys", ["Everything is in sync with origin/main."]),
-            [[button("📦 Apps", "apps"), menu_button()]],
+            [[button("📦 Apps", "apps")], footer("deploys")],
         )
     lines = [f"▲ <b>{esc(name)}</b> — {int(behind)} commits behind" for name, behind in pending]
     lines.append("")
     lines.append("<i>Deploy from the TUI (key 4) — deploys stay audited.</i>")
     return BotResponse(
         card("🚀", f"Pending deploys ({len(pending)})", lines),
-        [[button("📦 Apps", "apps"), menu_button()]],
+        [[button("📦 Apps", "apps")], footer("deploys")],
     )
 
 
-async def handle_digest(rt: Runtime) -> BotResponse:
+async def handle_digest(rt: Runtime, args: list[str]) -> BotResponse:
     recent = await rt.incidents.store.recent_incidents(since_s=86400)
     opened = len(recent)
     resolved = sum(1 for i in recent if i.get("status") == "resolved")
@@ -294,7 +442,7 @@ async def handle_digest(rt: Runtime) -> BotResponse:
                 button("💾 Backups", "backups"),
                 button("⏰ Crons", "crons"),
             ],
-            [menu_button()],
+            footer("digest"),
         ],
     )
 
@@ -346,4 +494,8 @@ COMMANDS: dict[str, Command] = {
     "apps": Command("App health and latency", handle_apps),
     "deploys": Command("Apps with commits waiting to deploy", handle_deploys),
     "help": Command("The menu", handle_help),
+    # Reached from a button, never typed.
+    "incident": Command("One incident", handle_incident, listed=False),
+    "ack": Command("Acknowledge an incident?", handle_ack, listed=False),
+    "ack_go": Command("Acknowledge an incident", handle_ack_go, listed=False),
 }

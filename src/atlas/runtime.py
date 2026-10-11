@@ -149,6 +149,8 @@ class Runtime:
                         self.db, self.ai, self.context, weekly=due == "weekly"
                     )
                     log.info("generated %s brief (%d chars)", due, len(body))
+                    if self.notifier is not None:
+                        await self.notifier.send_brief(due, body)
                     if due == "weekly":
                         last_weekly_brief = _time.time()
                     else:
