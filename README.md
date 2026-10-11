@@ -1,10 +1,21 @@
-# Atlas
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/mark-dark.svg">
+    <img src="docs/brand/mark.svg" width="88" height="88" alt="The Atlas mark: a rounded square holding a two by two grid of hosts, with one picked out in amber">
+  </picture>
+</p>
 
-[![CI](https://github.com/dcblack87/Atlas/actions/workflows/ci.yml/badge.svg)](https://github.com/dcblack87/Atlas/actions/workflows/ci.yml)
-![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)
-![License: MIT](https://img.shields.io/badge/license-MIT-green)
+<h1 align="center">Atlas</h1>
 
-**An AI-native operations platform for self-hosted infrastructure.**
+<p align="center"><strong>An AI-native operations platform for self-hosted infrastructure.</strong></p>
+
+<p align="center">
+  <a href="https://github.com/dcblack87/Atlas/actions/workflows/ci.yml"><img src="https://github.com/dcblack87/Atlas/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/python-3.12%2B-blue" alt="Python 3.12+">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT">
+</p>
+
+<br>
 
 Grafana + Datadog + PagerDuty + Claude, rebuilt for one developer, one
 Hetzner bill, and an e-ink tablet.
