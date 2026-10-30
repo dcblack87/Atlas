@@ -51,6 +51,34 @@ class DeploymentStore:
             ),
         )
 
+    async def close_abandoned(self, older_than_s: float) -> int:
+        """Close deploys that never finished: Atlas quit or crashed mid-deploy.
+
+        Without this they sit in the history as running forever, with no outcome.
+        Only rows older than the deploy timeout are touched, so nothing still
+        running in this process is closed under it.
+        """
+        now = int(time.time())
+        rows = await self._db.fetch_all(
+            "SELECT id FROM deployments WHERE finished_at IS NULL AND started_at < ?",
+            (now - int(older_than_s),),
+        )
+        for row in rows:
+            await self._db.execute(
+                """
+                UPDATE deployments
+                SET finished_at = ?, verify_status = 'abandoned',
+                    output = COALESCE(output || char(10), '') || ?
+                WHERE id = ?
+                """,
+                (
+                    now,
+                    "✖ Atlas stopped before this deploy finished; its outcome was never recorded",
+                    row["id"],
+                ),
+            )
+        return len(rows)
+
     async def recent(self, limit: int = 20) -> list[dict]:
         rows = await self._db.fetch_all(
             "SELECT * FROM deployments ORDER BY started_at DESC LIMIT ?", (limit,)

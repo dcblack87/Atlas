@@ -24,7 +24,7 @@ from atlas.redact import scrub_secrets
 from atlas.store.audit import DeploymentStore
 from atlas.store.db import Database
 from atlas.store.inventory import Inventory
-from atlas.transport.base import CommandFailed, Transport
+from atlas.transport.base import CommandFailed, HostUnreachable, Transport
 
 log = logging.getLogger(__name__)
 
@@ -81,6 +81,12 @@ class DeployOrchestrator:
     @property
     def audit(self) -> DeploymentStore:
         return self._audit
+
+    async def close_abandoned(self) -> int:
+        """Close audit rows left open by an Atlas that stopped mid-deploy."""
+        return await self._audit.close_abandoned(
+            self._config.deploy.timeout_seconds + SUPPRESS_EXTRA_S + 600
+        )
 
     def _resolve(self, app_name: str) -> tuple[HostConfig, AppConfig]:
         host = self._config.host_for_app(app_name)
@@ -213,7 +219,10 @@ class DeployOrchestrator:
                     "passed — the previous version may still be serving"
                 )
 
-            sha_after = await self._deployed_sha(transport, app)
+            try:
+                sha_after = await self._deployed_sha(transport, app)
+            except HostUnreachable:
+                sha_after = None
             verify_status = "passed" if result.passed else "failed"
             outcome = "✓" if result.passed else "✖ verification failed"
             if exit_code != 0:
