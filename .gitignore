@@ -1,5 +1,6 @@
 # Real inventory & secrets — NEVER commit. Use atlas.example.toml as the template.
 atlas.toml
+atlas.toml.bak*
 *.env
 .env*
 
