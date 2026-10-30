@@ -139,6 +139,10 @@ class Runtime:
                 if loop_time - last_hourly > RETENTION_INTERVAL_S:
                     last_hourly = loop_time
                     await run_retention(self.db)
+                    if self.deployer is not None:
+                        closed = await self.deployer.close_abandoned()
+                        if closed:
+                            log.info("closed %d deploy(s) left open by an earlier Atlas", closed)
                     await run_forecasts(self.db)
                     await run_anomaly_detection(self.db, self.bus)
                     if self.config is not None:

@@ -2,6 +2,7 @@
 
 import asyncio
 import shutil
+import time
 from pathlib import Path
 
 import pytest
@@ -11,7 +12,7 @@ from atlas.config import Config
 from atlas.deploy.orchestrator import DeployError, DeployOrchestrator, _host_locked
 from atlas.engine.incidents import IncidentManager
 from atlas.store.db import Database
-from atlas.transport.base import CommandFailed, Result
+from atlas.transport.base import CommandFailed, HostUnreachable, Result
 from atlas.transport.local import LocalTransport
 
 SHA_A = "a" * 40
@@ -179,6 +180,65 @@ async def test_timeout_is_recorded_as_124(env) -> None:
     event = await db.fetch_one("SELECT * FROM incident_events WHERE kind='deploy'")
     assert event is not None
     assert "deploy command timed out" in event["body"]
+
+
+async def test_host_going_silent_after_the_command_is_a_failed_deploy_not_a_crash(env) -> None:
+    # 30 Oct 2026: a build starved the host, SSH stopped answering during verification,
+    # HostUnreachable escaped and took the whole TUI down with the audit row left open.
+    orchestrator, transport, db, _ = env
+    transport.stream_error = TimeoutError("stream timed out")
+    real_run = transport.run
+
+    async def silent(cmd, *, timeout: float = 30):
+        if transport.stream_finished:
+            raise HostUnreachable("web-1", "")
+        return await real_run(cmd, timeout=timeout)
+
+    transport.stream_finished = False
+    original_stream = transport.stream
+
+    async def stream(cmd, *, timeout: float = 900):
+        try:
+            async for line in original_stream(cmd, timeout=timeout):
+                yield line
+        finally:
+            transport.stream_finished = True
+
+    transport.run = silent
+    transport.stream = stream
+    lines = [line async for line in orchestrator.deploy("shopfront", "shopfront")]
+    assert any("web-1: not answering" in line for line in lines)
+    assert any("VERIFICATION FAILED" in line for line in lines)
+
+    row = await db.fetch_one("SELECT * FROM deployments")
+    assert row["finished_at"] is not None
+    assert row["exit_code"] == 124
+    assert row["verify_status"] == "failed"
+    assert row["git_sha_after"] is None
+
+
+async def test_deploys_left_open_by_a_stopped_atlas_are_closed(env) -> None:
+    orchestrator, _transport, db, _ = env
+    await db.execute(
+        "INSERT INTO deployments (app, host, started_at, command, confirmed_phrase) "
+        "VALUES ('shopfront', 'web-1', 1000, 'deploy', 'shopfront')"
+    )
+    assert await orchestrator.close_abandoned() == 1
+    row = await db.fetch_one("SELECT * FROM deployments")
+    assert row["finished_at"] is not None
+    assert row["verify_status"] == "abandoned"
+    assert "never recorded" in row["output"]
+    assert await orchestrator.close_abandoned() == 0
+
+
+async def test_a_deploy_still_inside_its_timeout_is_not_closed(env) -> None:
+    orchestrator, _transport, db, _ = env
+    await db.execute(
+        "INSERT INTO deployments (app, host, started_at, command, confirmed_phrase) "
+        "VALUES ('shopfront', 'web-1', ?, 'deploy', 'shopfront')",
+        (int(time.time()) - 60,),
+    )
+    assert await orchestrator.close_abandoned() == 0
 
 
 async def test_deploy_runs_under_the_host_lock(env) -> None:

@@ -6,6 +6,7 @@ DeployOrchestrator's gate.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, ClassVar
 
 from textual.app import ComposeResult
@@ -16,6 +17,8 @@ from textual.widgets import Footer, ListItem, ListView, Static
 from atlas.deploy.orchestrator import DeployError, Preflight
 from atlas.tui.widgets.confirm import TypedConfirm
 from atlas.tui.widgets.stream_log import StreamLog
+
+log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from atlas.app import AtlasApp
@@ -184,6 +187,10 @@ class DeployScreen(Screen):
                     stream.push(line)
         except DeployError as e:
             stream.push(f"✖ {e}")
+        except Exception as e:
+            # Anything else must end this deploy's stream, not the whole app.
+            log.exception("deploy of %s stopped", app_name)
+            stream.push(f"✖ deploy stopped: {e}")
         finally:
             self._deploying = False
             # the screen may be gone if the worker was cancelled from outside

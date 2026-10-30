@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass, field
 
 from atlas.config import AppConfig, HostConfig
-from atlas.transport.base import Transport
+from atlas.transport.base import HostUnreachable, Transport
 
 GRACE_S = 15
 POLL_TIMEOUT_S = 180
@@ -43,7 +43,15 @@ async def verify_deploy(
     deadline = time.monotonic() + POLL_TIMEOUT_S
     result = VerifyResult(passed=False)
     while True:
-        result = await _check_once(transport, host, app_name, app, sites)
+        try:
+            result = await _check_once(transport, host, app_name, app, sites)
+        except HostUnreachable as e:
+            # A deploy that starves the host can leave it silent for minutes. That is a
+            # failed check, not a crash: keep polling, it may come back before the deadline.
+            result = VerifyResult(
+                passed=False,
+                checks=[(host.name, False, f"not answering ({e.reason or 'no reply'})")],
+            )
         if result.passed or time.monotonic() > deadline:
             return result
         await asyncio.sleep(POLL_INTERVAL_S)
