@@ -1,8 +1,20 @@
 # Real inventory & secrets — NEVER commit. Use atlas.example.toml as the template.
+# This repository is public: see AGENTS.md. Backups belong outside this folder.
 atlas.toml
-atlas.toml.bak*
+atlas.toml.*
+atlas*.toml
+!atlas.example.toml
+*.toml.bak*
+*.bak
+*.bak-*
+*.orig
+*.old
+*~
 *.env
 .env*
+
+# Local tool settings (may hold real hosts and commands)
+.claude/settings.local.json
 
 # Runtime state
 *.db
