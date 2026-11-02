@@ -7,6 +7,7 @@ multi-site apps every discovered site individually.
 from __future__ import annotations
 
 import asyncio
+import shlex
 import time
 from dataclasses import dataclass, field
 
@@ -110,12 +111,16 @@ async def _check_once(
 
 async def _container_state(transport: Transport, container: str) -> str:
     result = await transport.run(
-        ["sh", "-c", f"docker inspect --format '{{{{.State.Status}}}}' {container} 2>/dev/null"],
+        [
+            "sh",
+            "-c",
+            f"docker inspect --format '{{{{.State.Status}}}}' {shlex.quote(container)} 2>/dev/null",
+        ],
         timeout=15,
     )
     return result.stdout.strip() or "missing"
 
 
 async def _http_code(transport: Transport, url: str) -> str:
-    result = await transport.run(["sh", "-c", f"{_CURL} {url}"], timeout=15)
+    result = await transport.run(["sh", "-c", f"{_CURL} {shlex.quote(url)}"], timeout=15)
     return result.stdout.strip() or "000"

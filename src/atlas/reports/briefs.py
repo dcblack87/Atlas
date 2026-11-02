@@ -13,12 +13,15 @@ import time
 from datetime import datetime
 
 from atlas.ai.client import AIClient, AIDisabled, BudgetExhausted
-from atlas.ai.context import ContextBuilder
+from atlas.ai.context import ContextBuilder, fenced
 from atlas.engine.health import health_scores
 from atlas.store.db import Database
 from atlas.store.incidents import IncidentStore
 
 log = logging.getLogger(__name__)
+
+# AI text is written from server data a compromised app can influence
+AI_NOTE = "AI summary: check any command yourself before running it"
 
 
 async def build_skeleton(db: Database, *, window_s: int) -> str:
@@ -77,7 +80,7 @@ async def generate_brief(
             narrative = await ai.complete(
                 kind,
                 await context.system_blocks(),
-                f"STATUS SKELETON\n{skeleton}\n\n"
+                f"STATUS SKELETON\n{fenced(skeleton)}\n\n"
                 f"Write a {'weekly' if weekly else 'morning'} brief for the operator: "
                 "5-10 short lines, most important first, concrete next actions with "
                 "commands where useful. No preamble.",
@@ -89,7 +92,7 @@ async def generate_brief(
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     title = "WEEKLY BRIEF" if weekly else "MORNING BRIEF"
     body = (
-        f"{title} — {stamp}\n\n{narrative}\n\n— data —\n{skeleton}"
+        f"{title} — {stamp}\n\n{narrative}\n({AI_NOTE})\n\n— data —\n{skeleton}"
         if narrative
         else (f"{title} — {stamp}\n\n{skeleton}")
     )

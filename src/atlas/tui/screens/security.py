@@ -12,6 +12,7 @@ from textual.timer import Timer
 from textual.widgets import Footer, Static
 
 from atlas.model import DisplayProfile
+from atlas.tui.safe import plain
 from atlas.tui.widgets.tiles import GLYPH_OK, GLYPH_WARN
 
 if TYPE_CHECKING:
@@ -95,7 +96,7 @@ class SecurityScreen(Screen):
         widget = self.query_one("#body", Static)
         if getattr(widget, "_atlas_last", None) != text:
             widget._atlas_last = text  # type: ignore[attr-defined]
-            widget.update(text)
+            widget.update(plain(text))
 
 
 def _n(value: object) -> str:

@@ -7,6 +7,8 @@ cycle with no config change; the diff lands on the timeline.
 
 from __future__ import annotations
 
+import re
+import shlex
 from typing import TYPE_CHECKING
 
 from atlas.collectors.base import Collector, register
@@ -75,7 +77,7 @@ class DiscoveryCollector(Collector):
             [
                 "sh",
                 "-c",
-                f"for f in {app.sites_dir}/*/.port; do "
+                f"for f in {shlex.quote(str(app.sites_dir))}/*/.port; do "
                 f"[ -f \"$f\" ] && printf '%s\\t%s\\n' "
                 f'"$(basename "$(dirname "$f")")" "$(cat "$f")"; '
                 f"done",
@@ -85,12 +87,17 @@ class DiscoveryCollector(Collector):
         return parse_sites(result.stdout, app_name, app.container_prefix or "")
 
 
+# A site's folder name becomes part of a container name and of later commands, and
+# anything on the server that can create a folder chooses it. Only plain names count.
+_SITE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$")
+
+
 def parse_sites(stdout: str, app_name: str, container_prefix: str) -> list[Entity]:
     sites: list[Entity] = []
     for line in stdout.strip().splitlines():
         name, _, port = line.partition("\t")
         name, port = name.strip(), port.strip()
-        if not name or not port.isdigit():
+        if not _SITE_NAME.match(name) or not port.isdigit():
             continue
         sites.append(
             Entity(

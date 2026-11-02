@@ -17,6 +17,7 @@ from textual.timer import Timer
 from textual.widgets import DataTable, Footer, Static
 
 from atlas.model import DisplayProfile
+from atlas.tui.safe import plain
 from atlas.tui.widgets.tiles import GLYPH_CRIT, GLYPH_OK, GLYPH_WARN
 
 if TYPE_CHECKING:
@@ -106,13 +107,13 @@ class CronsScreen(Screen):
         self._rows &= wanted
         for key, cells, _weight in rows:
             if key not in self._rows:
-                table.add_row(*cells, key=key)
+                table.add_row(*(plain(cell) for cell in cells), key=key)
                 self._rows.add(key)
             else:
                 for column, value in zip(COLUMNS, cells, strict=True):
                     column_key = column or "glyph"
-                    if table.get_cell(key, column_key) != value:
-                        table.update_cell(key, column_key, value)
+                    if table.get_cell(key, column_key) != plain(value):
+                        table.update_cell(key, column_key, plain(value))
 
         title = self.query_one("#crons-title", Static)
         failed = sum(1 for _, _, w in rows if w == 0)
@@ -124,7 +125,7 @@ class CronsScreen(Screen):
             summary += f" — {late} late"
         if getattr(title, "_atlas_last", None) != summary:
             title._atlas_last = summary  # type: ignore[attr-defined]
-            title.update(summary)
+            title.update(plain(summary))
 
     def action_copy_table(self) -> None:
         from atlas.tui.clipboard import copy_text

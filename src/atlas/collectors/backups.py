@@ -6,6 +6,7 @@ Convention over configuration: every managed app keeps dumps under
 
 from __future__ import annotations
 
+import shlex
 import time
 from typing import TYPE_CHECKING
 
@@ -39,7 +40,7 @@ class BackupsCollector(Collector):
                 [
                     "sh",
                     "-c",
-                    f"find {backups_path} -type f "
+                    f"find {shlex.quote(backups_path)} -type f "
                     f"\\( -name '*.gz' -o -name '*.dump' -o -name '*.sql' -o -name '*.enc' \\) "
                     f"-printf '%T@ %s\\n' 2>/dev/null | sort -rn | head -1",
                 ],

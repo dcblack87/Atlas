@@ -89,6 +89,9 @@ class TelegramSection(BaseModel):
     enabled: bool = False
     bot_token: str | None = None
     chat_id: str | None = None
+    # In a group chat, only these Telegram user ids may use the bot. Empty means
+    # anyone in the chat, which is fine for a private chat with the bot.
+    allowed_user_ids: list[int] = Field(default_factory=list)
     min_severity: Literal["critical", "warning"] = "critical"
     bot_commands: bool = True  # answer /status etc. via long polling
     daily_brief: bool = True  # send the 07:00 morning brief to the chat

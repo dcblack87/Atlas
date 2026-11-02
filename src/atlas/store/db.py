@@ -9,6 +9,7 @@ Migrations are numbered SQL files applied in order, gated by
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
 from pathlib import Path
@@ -40,6 +41,14 @@ class Database:
                 await conn.close()
         self._write = self._read = None
 
+    def _owner_only(self) -> None:
+        """The database holds fleet data: tighten files made before Atlas set its umask."""
+        for suffix in ("", "-wal", "-shm"):
+            path = self.path.with_name(self.path.name + suffix)
+            with contextlib.suppress(OSError):
+                if path.exists():
+                    path.chmod(0o600)
+
     async def _connect(self) -> aiosqlite.Connection:
         pending = aiosqlite.connect(self.path)
         # aiosqlite runs each connection on a non-daemon worker thread; a
@@ -52,6 +61,7 @@ class Database:
         conn = await pending
         conn.row_factory = aiosqlite.Row
         await conn.execute("PRAGMA journal_mode=WAL")
+        self._owner_only()
         await conn.execute("PRAGMA synchronous=NORMAL")
         await conn.execute("PRAGMA busy_timeout=5000")
         await conn.execute("PRAGMA foreign_keys=ON")

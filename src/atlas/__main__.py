@@ -9,6 +9,7 @@ atlas db <cmd>                    database maintenance (M1)
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from atlas import __version__
@@ -16,6 +17,9 @@ from atlas.config import ConfigError, load_config
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Everything Atlas writes (the database, context bundles) describes the fleet:
+    # readable by its owner only.
+    os.umask(0o077)
     parser = argparse.ArgumentParser(prog="atlas", description=__doc__)
     parser.add_argument("--version", action="version", version=f"atlas {__version__}")
     sub = parser.add_subparsers(dest="command")

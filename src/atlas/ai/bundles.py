@@ -23,7 +23,8 @@ async def write_bundle(context: ContextBuilder, app: str | None = None) -> Path:
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     name = f"atlas-context-{app or 'fleet'}-{stamp}.md"
-    BUNDLES_DIR.mkdir(exist_ok=True)
+    BUNDLES_DIR.mkdir(mode=0o700, exist_ok=True)
+    BUNDLES_DIR.chmod(0o700)  # it holds fleet details: the owner's eyes only
     path = BUNDLES_DIR / name
 
     body = f"""# Atlas context bundle — {app or "whole fleet"}
@@ -43,5 +44,6 @@ Paste this into Claude Code and ask it to diagnose or plan against it.
 {scrub(detail)}
 ```
 """
+    path.touch(mode=0o600)
     path.write_text(body)
     return path

@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from typing import ClassVar
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Static
+
+from atlas.tui.safe import clean, plain
 
 
 class TextModal(ModalScreen[None]):
@@ -37,8 +40,8 @@ class TextModal(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with VerticalScroll():
-            yield Static(f"[b]{self._title}[/b]\n")
-            yield Static(self._body)
+            yield Static(Text(clean(self._title) + "\n", style="bold"))
+            yield Static(plain(self._body))
 
     def action_dismiss(self) -> None:
         self.dismiss(None)

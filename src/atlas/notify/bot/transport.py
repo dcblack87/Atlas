@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,6 +20,19 @@ import httpx
 from atlas.notify.bot.format import chunk
 
 log = logging.getLogger(__name__)
+
+# The bot token is part of every request URL. httpx logs each request at INFO and
+# puts the URL in its errors, so keep its loggers quiet and scrub anything we log.
+for _noisy in ("httpx", "httpcore"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
+
+_TOKEN_IN_URL = re.compile(r"/bot[^/\s'\"]+")
+
+
+def without_token(text: object) -> str:
+    """Any text with the bot token taken out of Telegram URLs."""
+    return _TOKEN_IN_URL.sub("/bot<token>", str(text))
+
 
 SEND_TIMEOUT = 10.0
 ACK_TIMEOUT = 5.0
@@ -52,7 +66,9 @@ class BotAPI:
             response = await client.get(f"{self._base}/getUpdates", params=params)
             if response.status_code == 409:
                 raise PollConflict(response.text[:200])
-            response.raise_for_status()
+            if response.status_code != 200:
+                # Not raise_for_status(): its message carries the URL, and so the token.
+                raise RuntimeError(f"getUpdates -> HTTP {response.status_code}")
             data = response.json()
         return data.get("result", []) if data.get("ok") else []
 
@@ -136,8 +152,9 @@ class BotAPI:
                 async with httpx.AsyncClient(timeout=timeout) as client:
                     response = await client.post(f"{self._base}/{method}", json=payload)
             except httpx.HTTPError as e:
-                log.warning("telegram %s failed: %s", method, e)
-                return Result(False, str(e) or type(e).__name__, 0)
+                reason = without_token(e) or type(e).__name__
+                log.warning("telegram %s failed: %s", method, reason)
+                return Result(False, reason, 0)
             if response.status_code == 200:
                 return Result(True)
             try:

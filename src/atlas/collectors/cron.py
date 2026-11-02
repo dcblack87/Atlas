@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -123,7 +124,7 @@ class CronCollector(Collector):
         log_status: dict[str, str] = {}
         if log_paths:
             tail_script = f"; echo '{_SECTION}'".join(
-                f"tail -30 {path} 2>/dev/null" for path in log_paths
+                f"tail -30 {shlex.quote(path)} 2>/dev/null" for path in log_paths
             )
             tails = await transport.run(["sh", "-c", tail_script], timeout=20)
             chunks = _split_sections(tails.stdout, len(log_paths))
@@ -333,7 +334,8 @@ def _parse_lines(lines: list[str], *, source: str, has_user: bool) -> list[CronJ
             pending_comment = None
             continue
         schedule, user, command = parsed
-        name = _name_from_comment(pending_comment) or _fallback_name(command)
+        # A job's name goes into alerts, Telegram and AI prompts: never a credential
+        name = scrub_secrets(_name_from_comment(pending_comment) or _fallback_name(command))
         pending_comment = None
         jobs.append(
             CronJob(
@@ -391,12 +393,13 @@ def _fallback_name(command: str) -> str:
     if match:
         return match.group(1).replace("-", " ")
     for token in command.split():
-        if token in {"bash", "sh", "curl", "cd", "for", "flock", "nice", "timeout"}:
+        if token in {"bash", "sh", "curl", "cd", "for", "flock", "nice", "timeout", "env"}:
             continue
-        if token.startswith("-"):
+        # Flags, and VAR=value assignments, which is where secrets sit on a cron line
+        if token.startswith("-") or "=" in token:
             continue
         return token.rsplit("/", 1)[-1]
-    return command[:32]
+    return "job"
 
 
 def _slugify(name: str) -> str:

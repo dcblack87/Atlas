@@ -11,6 +11,7 @@ from textual.timer import Timer
 from textual.widgets import Footer, Static
 
 from atlas.model import DisplayProfile
+from atlas.tui.safe import plain
 
 if TYPE_CHECKING:
     from atlas.app import AtlasApp
@@ -92,4 +93,4 @@ class CostScreen(Screen):
         widget = self.query_one(f"#{widget_id}", Static)
         if getattr(widget, "_atlas_last", None) != text:
             widget._atlas_last = text  # type: ignore[attr-defined]
-            widget.update(text)
+            widget.update(plain(text))

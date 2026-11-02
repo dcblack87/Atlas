@@ -9,10 +9,13 @@ from __future__ import annotations
 
 from typing import ClassVar
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Static
+
+from atlas.tui.safe import clean, plain
 
 
 class TypedConfirm(ModalScreen[str | None]):
@@ -45,9 +48,9 @@ class TypedConfirm(ModalScreen[str | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical():
-            yield Static(f"[b]{self._title}[/b]")
-            yield Static(self._detail, id="detail")
-            yield Static(f'Type "{self._required}" to confirm — Esc aborts', id="hint")
+            yield Static(Text(clean(self._title), style="bold"))
+            yield Static(plain(self._detail), id="detail")
+            yield Static(plain(f'Type "{self._required}" to confirm — Esc aborts'), id="hint")
             yield Input(placeholder=self._required, id="phrase")
             yield Button("Confirm", id="confirm", disabled=True, variant="warning")
 

@@ -119,14 +119,14 @@ class DeployOrchestrator:
 
     async def _deployed_sha(self, transport: Transport, app: AppConfig) -> str | None:
         result = await transport.run(
-            ["sh", "-c", f"git -C {app.path} rev-parse HEAD 2>/dev/null"], timeout=15
+            ["sh", "-c", f"{_git(app)} rev-parse HEAD 2>/dev/null"], timeout=15
         )
         sha = result.stdout.strip()
         return sha if len(sha) == 40 else None
 
     async def _remote_sha(self, transport: Transport, app: AppConfig) -> str | None:
         result = await transport.run(
-            ["sh", "-c", f"git -C {app.path} ls-remote origin HEAD 2>/dev/null | cut -f1"],
+            ["sh", "-c", f"{_git(app)} ls-remote origin HEAD 2>/dev/null | cut -f1"],
             timeout=30,
         )
         sha = result.stdout.strip()
@@ -351,3 +351,16 @@ def _is_safe_param(value: str) -> bool:
     """Remediation params come from inventory, but never trust a string that
     could escape into the shell."""
     return bool(value) and all(c.isalnum() or c in "-_./:" for c in value)
+
+
+def _git(app: AppConfig) -> str:
+    """git in the app's checkout, ignoring settings in that checkout that could run commands.
+
+    Previewing a deploy runs git just from looking at the app, with no confirmation. The
+    repository's own .git/config is writable by the app, so its ssh command, file-system
+    monitor and ext:: remotes are overridden here.
+    """
+    return (
+        f"git -C {shlex.quote(str(app.path))} -c core.sshCommand=ssh -c core.fsmonitor=false "
+        "-c protocol.ext.allow=never"
+    )

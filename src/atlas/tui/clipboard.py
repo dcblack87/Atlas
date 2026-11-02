@@ -30,7 +30,9 @@ def _is_local_macos() -> bool:
 
 
 def copy_text(screen: Screen, text: str, what: str) -> None:
-    text = text.strip()
+    from atlas.tui.safe import clean
+
+    text = clean(text).strip()  # what lands in the clipboard is pasted into shells
     if not text:
         screen.notify("nothing to copy", severity="warning", timeout=2)
         return
@@ -41,4 +43,4 @@ def copy_text(screen: Screen, text: str, what: str) -> None:
         except (OSError, subprocess.SubprocessError):
             log.warning("pbcopy fallback failed", exc_info=True)
     lines = text.count("\n") + 1
-    screen.notify(f"copied {what} ({lines} lines)", timeout=2)
+    screen.notify(f"copied {clean(what)} ({lines} lines)", timeout=2, markup=False)

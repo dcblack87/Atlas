@@ -10,6 +10,8 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, ListItem, ListView, Static
 
+from atlas.tui.safe import plain
+
 if TYPE_CHECKING:
     from atlas.app import AtlasApp
 
@@ -61,7 +63,7 @@ class ReportsScreen(Screen):
                 f"{datetime.fromtimestamp(row['ts']):%m-%d %H:%M} "
                 f"{'weekly' if 'weekly' in row['kind'] else 'daily'}"
             )
-            picker.append(ListItem(Static(label), name=str(row["id"])))
+            picker.append(ListItem(Static(plain(label)), name=str(row["id"])))
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         if event.item.name:
@@ -75,7 +77,7 @@ class ReportsScreen(Screen):
             "SELECT response FROM ai_analyses WHERE id = ?", (analysis_id,)
         )
         self._shown = body or ""
-        self.query_one("#body", Static).update(body or "empty")
+        self.query_one("#body", Static).update(plain(body or "empty"))
 
     def action_generate(self) -> None:
         self.run_worker(self._generate(), exclusive=True, group="reports")
@@ -91,5 +93,5 @@ class ReportsScreen(Screen):
         context = rt.context or ContextBuilder(rt.db)
         body = await generate_brief(rt.db, rt.ai, context)
         self._shown = body
-        self.query_one("#body", Static).update(body)
+        self.query_one("#body", Static).update(plain(body))
         await self._load()

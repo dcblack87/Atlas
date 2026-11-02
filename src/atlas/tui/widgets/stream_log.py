@@ -9,6 +9,8 @@ from __future__ import annotations
 from textual.timer import Timer
 from textual.widgets import RichLog
 
+from atlas.tui.safe import clean
+
 
 class StreamLog(RichLog):
     def __init__(self, *, id: str | None = None) -> None:
@@ -33,6 +35,8 @@ class StreamLog(RichLog):
             self._flush_timer = self.set_interval(seconds, self._flush)
 
     def push(self, line: str) -> None:
+        # Container logs and deploy output come from the server: no escape sequences
+        line = clean(line)
         if self._flush_period > 0:
             self._buffer.append(line)
         else:

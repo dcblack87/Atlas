@@ -16,6 +16,7 @@ from textual.timer import Timer
 from textual.widgets import Footer, ListItem, ListView, Static
 
 from atlas.model import DisplayProfile
+from atlas.tui.safe import clean, plain
 from atlas.tui.widgets.tiles import GLYPH_CRIT, GLYPH_OK
 
 if TYPE_CHECKING:
@@ -58,7 +59,7 @@ class AppsScreen(Screen):
         elif rt is not None:  # demo mode: no config, read inventory
             names = [a["key"].removeprefix("app:") for a in await rt.inventory.entities(kind="app")]
         for name in names:
-            picker.append(ListItem(Static(name), name=name))
+            picker.append(ListItem(Static(plain(name)), name=name))
         self._start_clock(self.atlas.profile)
 
     def on_profile_changed(self, profile: DisplayProfile) -> None:
@@ -91,7 +92,7 @@ class AppsScreen(Screen):
         apps = {a["key"]: a for a in await rt.inventory.entities(kind="app")}
         host = (apps.get(entity, {}).get("parent") or "").removeprefix("host:")
 
-        lines = [f"[b]{app_name}[/b]   host {host or '?'}"]
+        lines = [f"{app_name}   host {host or '?'}"]
 
         # health
         up = snap.get("http.up")
@@ -202,10 +203,12 @@ class AppsScreen(Screen):
         widget = self.query_one("#detail", Static)
         if getattr(widget, "_atlas_last", None) != text:
             widget._atlas_last = text  # type: ignore[attr-defined]
-            widget.update(text)
+            content = plain(text)
+            content.stylize("bold", 0, len(clean(app_name)))
+            widget.update(content)
 
     def action_copy_detail(self) -> None:
         from atlas.tui.clipboard import copy_text
 
         body = getattr(self.query_one("#detail", Static), "_atlas_last", "") or ""
-        copy_text(self, body.replace("[b]", "").replace("[/b]", ""), "app detail")
+        copy_text(self, body, "app detail")

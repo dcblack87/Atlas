@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 from atlas.config import TelegramSection
 from atlas.notify.bot.commands import bot_command_list, process
 from atlas.notify.bot.format import read_tap
-from atlas.notify.bot.transport import BotAPI, PollConflict
+from atlas.notify.bot.transport import BotAPI, PollConflict, without_token
 
 if TYPE_CHECKING:
     from atlas.runtime import Runtime
@@ -77,7 +77,7 @@ class TelegramBot:
                 await asyncio.sleep(CONFLICT_BACKOFF_S)
                 continue
             except Exception as e:
-                log.warning("telegram poll failed: %s", e)
+                log.warning("telegram poll failed: %s", without_token(e) or type(e).__name__)
                 await asyncio.sleep(ERROR_BACKOFF_S)
                 continue
             for update in updates:
@@ -92,7 +92,7 @@ class TelegramBot:
         if callback is not None:
             message = callback.get("message") or {}
             chat_id = str(message.get("chat", {}).get("id", ""))
-            if not self._authorized(chat_id):
+            if not self._authorized(chat_id, callback.get("from")):
                 await self._api.answer_callback(callback["id"])
                 return
             command, fresh = read_tap(str(callback.get("data", "")))
@@ -115,7 +115,7 @@ class TelegramBot:
             return
         chat_id = str(message.get("chat", {}).get("id", ""))
         text = str(message.get("text", ""))
-        if not self._authorized(chat_id):
+        if not self._authorized(chat_id, message.get("from")):
             # self-service onboarding: tell the very first /start its chat id
             if not self._config.chat_id and text.startswith("/start"):
                 await self._api.send_message(
@@ -130,5 +130,9 @@ class TelegramBot:
         if response is not None:
             await self._api.send_message(chat_id, response.text, response.keyboard)
 
-    def _authorized(self, chat_id: str) -> bool:
-        return bool(self._config.chat_id) and chat_id == str(self._config.chat_id)
+    def _authorized(self, chat_id: str, sender: dict | None = None) -> bool:
+        """The configured chat, and in it, when a user list is set, only those people."""
+        if not self._config.chat_id or chat_id != str(self._config.chat_id):
+            return False
+        allowed = self._config.allowed_user_ids
+        return not allowed or (sender or {}).get("id") in allowed

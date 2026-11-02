@@ -89,6 +89,7 @@ max_auto_insights_per_day = 10
 enabled = false
 # bot_token = "..."               # or $ATLAS_TELEGRAM_TOKEN
 # chat_id = "..."                 # leave unset, send the bot /start, it replies with the id
+# allowed_user_ids = [123456789]  # in a group chat, only these people may use the bot
 # min_severity = "critical"       # "critical" (default) or "warning"
 # bot_commands = true             # answer /status, /backups, /crons ... via long polling
 # daily_brief = true              # send the 07:00 morning brief to the chat

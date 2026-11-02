@@ -13,6 +13,7 @@ from textual.timer import Timer
 from textual.widgets import DataTable, Footer, Static
 
 from atlas.model import DisplayProfile
+from atlas.tui.safe import clean, plain
 from atlas.tui.widgets.tiles import GLYPH_CRIT, GLYPH_WARN
 
 if TYPE_CHECKING:
@@ -118,13 +119,13 @@ class IncidentsScreen(Screen):
                 incident["status"],
             )
             if key not in self._rows:
-                table.add_row(*cells, key=key)
+                table.add_row(*(plain(cell) for cell in cells), key=key)
                 self._rows.add(key)
             else:
                 for column, value in zip(COLUMNS, cells, strict=True):
                     column_key = column or "glyph"
-                    if table.get_cell(key, column_key) != value:
-                        table.update_cell(key, column_key, value)
+                    if table.get_cell(key, column_key) != plain(value):
+                        table.update_cell(key, column_key, plain(value))
 
         events = await rt.incidents.store.timeline(since_s=24 * 3600, limit=40)
         lines = [
@@ -134,7 +135,7 @@ class IncidentsScreen(Screen):
         widget = self.query_one("#timeline", Static)
         if getattr(widget, "_atlas_last", None) != text:
             widget._atlas_last = text  # type: ignore[attr-defined]
-            widget.update(text)
+            widget.update(plain(text))
 
     def _selected_incident(self) -> int | None:
         table = self.query_one("#open", DataTable)
@@ -167,9 +168,10 @@ class IncidentsScreen(Screen):
         try:
             text = await rt.insights.explain_incident(incident_id)
         except (BudgetExhausted, AIDisabled) as e:
-            self.notify(str(e), severity="warning", timeout=5)
+            self.notify(clean(e), severity="warning", timeout=5, markup=False)
             return
-        self.app.push_screen(TextModal(f"Incident #{incident_id} — AI analysis", text))
+        title = f"Incident #{incident_id} — AI analysis (check commands before running)"
+        self.app.push_screen(TextModal(title, text))
         self.refresh_data()  # the insight also landed on the timeline
 
 

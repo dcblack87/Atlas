@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 from typing import TYPE_CHECKING, ClassVar
 
 from textual.app import ComposeResult
@@ -9,6 +10,7 @@ from textual.containers import Horizontal
 from textual.screen import Screen
 from textual.widgets import Footer, ListItem, ListView, Static
 
+from atlas.tui.safe import plain
 from atlas.tui.widgets.stream_log import StreamLog
 
 if TYPE_CHECKING:
@@ -72,9 +74,8 @@ class LogsScreen(Screen):
         stream = self.query_one("#log", StreamLog)
         stream.clear()
         stream.push(f"— docker logs --tail {TAIL_LINES} {container} —")
-        result = await transport.run(
-            ["sh", "-c", f"docker logs --tail {TAIL_LINES} {container} 2>&1"], timeout=30
-        )
+        command = f"docker logs --tail {TAIL_LINES} {shlex.quote(container)} 2>&1"
+        result = await transport.run(["sh", "-c", command], timeout=30)
         for line in result.stdout.splitlines():
             stream.push(line)
         stream.finish()
@@ -82,4 +83,4 @@ class LogsScreen(Screen):
 
 class StaticName(Static):
     def __init__(self, key: str) -> None:
-        super().__init__(key.removeprefix("container:"))
+        super().__init__(plain(key.removeprefix("container:")))

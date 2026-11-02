@@ -13,6 +13,8 @@ from textual.containers import Vertical
 from textual.reactive import reactive
 from textual.widgets import Static
 
+from atlas.tui.safe import plain
+
 # Severity glyphs — colour-independent so they survive greyscale.
 GLYPH_OK = "●"
 GLYPH_WARN = "▲"
@@ -37,16 +39,16 @@ class StatTile(Vertical):
 
     def compose(self) -> ComposeResult:
         yield Static(self._title, classes="tile-title")
-        yield Static(self.value, classes="tile-value", id="value")
-        yield Static(self.hint, classes="tile-hint", id="hint")
+        yield Static(plain(self.value), classes="tile-value", id="value")
+        yield Static(plain(self.hint), classes="tile-hint", id="hint")
 
     def watch_value(self, value: str) -> None:
         if self.is_mounted:
-            self.query_one("#value", Static).update(value)
+            self.query_one("#value", Static).update(plain(value))
 
     def watch_hint(self, hint: str) -> None:
         if self.is_mounted:
-            self.query_one("#hint", Static).update(hint)
+            self.query_one("#hint", Static).update(plain(hint))
 
     def watch_status(self, status: str) -> None:
         if not self.is_mounted:

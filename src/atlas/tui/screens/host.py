@@ -15,6 +15,7 @@ from textual.timer import Timer
 from textual.widgets import DataTable, Footer, ListItem, ListView, Static
 
 from atlas.model import DisplayProfile
+from atlas.tui.safe import clean, plain
 
 if TYPE_CHECKING:
     from atlas.app import AtlasApp
@@ -59,7 +60,7 @@ class HostScreen(Screen):
         picker = self.query_one("#picker", ListView)
         if self.atlas.config:
             for host in self.atlas.config.hosts:
-                picker.append(ListItem(Static(host.name), name=host.name))
+                picker.append(ListItem(Static(plain(host.name)), name=host.name))
         self._start_clock(self.atlas.profile)
 
     def on_profile_changed(self, profile: DisplayProfile) -> None:
@@ -108,7 +109,7 @@ class HostScreen(Screen):
         widget = self.query_one("#summary", Static)
         if getattr(widget, "_atlas_last", None) != summary:
             widget._atlas_last = summary  # type: ignore[attr-defined]
-            widget.update(summary)
+            widget.update(plain(summary))
 
         containers = await rt.inventory.entities(kind="container", parent=host_key)
         table = self.query_one("#containers", DataTable)
@@ -130,12 +131,12 @@ class HostScreen(Screen):
                 "mem": _fmt_opt(csnap.get("container.mem_pct"), "{:.0f}%"),
             }
             if key not in self._rows:
-                table.add_row(*(cells[col] for col in COLUMNS), key=key)
+                table.add_row(*(plain(cells[col]) for col in COLUMNS), key=key)
                 self._rows.add(key)
             else:
                 for col in COLUMNS:
-                    if table.get_cell(key, col) != cells[col]:
-                        table.update_cell(key, col, cells[col])
+                    if table.get_cell(key, col) != plain(cells[col]):
+                        table.update_cell(key, col, plain(cells[col]))
 
     def action_explain(self) -> None:
         host_name = self._selected_host()
@@ -154,9 +155,10 @@ class HostScreen(Screen):
         try:
             text = await rt.insights.explain_entity(entity_key)
         except (BudgetExhausted, AIDisabled) as e:
-            self.notify(str(e), severity="warning", timeout=5)
+            self.notify(clean(e), severity="warning", timeout=5, markup=False)
             return
-        self.app.push_screen(TextModal(f"{entity_key} — AI summary", text))
+        title = f"{entity_key} — AI summary (check commands before running)"
+        self.app.push_screen(TextModal(title, text))
 
 
 def _fmt_opt(value: float | None, spec: str) -> str:

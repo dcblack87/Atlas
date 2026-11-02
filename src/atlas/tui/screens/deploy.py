@@ -15,6 +15,7 @@ from textual.screen import Screen
 from textual.widgets import Footer, ListItem, ListView, Static
 
 from atlas.deploy.orchestrator import DeployError, Preflight
+from atlas.tui.safe import plain
 from atlas.tui.widgets.confirm import TypedConfirm
 from atlas.tui.widgets.stream_log import StreamLog
 
@@ -77,7 +78,7 @@ class DeployScreen(Screen):
         picker = self.query_one("#picker", ListView)
         if self.atlas.config:
             for name in self.atlas.config.apps:
-                picker.append(ListItem(Static(name), name=name))
+                picker.append(ListItem(Static(plain(name)), name=name))
         stream = self.query_one("#stream", StreamLog)
         profile = self.atlas.profile
         stream.set_flush_period(0 if profile.name == "standard" else 2.0)
@@ -96,11 +97,11 @@ class DeployScreen(Screen):
         if rt is None or rt.deployer is None or app_name is None:
             return
         widget = self.query_one("#preflight", Static)
-        widget.update(f"preflight for {app_name}…")
+        widget.update(plain(f"preflight for {app_name}…"))
         try:
             pf = await rt.deployer.preflight(app_name)
         except (DeployError, Exception) as e:
-            widget.update(f"preflight failed: {e}")
+            widget.update(plain(f"preflight failed: {e}"))
             self._preflight = None
             return
         self._preflight = pf
@@ -119,7 +120,7 @@ class DeployScreen(Screen):
         if pf.open_incidents:
             lines.append(f"▲ open incidents: {'; '.join(pf.open_incidents[:3])}")
         lines.append("press d to deploy")
-        widget.update("\n".join(lines))
+        widget.update(plain("\n".join(lines)))
 
     # ── actions ──────────────────────────────────────────────────────
 

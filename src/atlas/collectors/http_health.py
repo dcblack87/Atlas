@@ -8,6 +8,7 @@ where Atlas happens to be running.
 from __future__ import annotations
 
 import json
+import shlex
 from typing import TYPE_CHECKING
 
 from atlas.collectors.base import Collector, register
@@ -79,7 +80,8 @@ class HttpHealthCollector(Collector):
 
         # Structured health endpoints get their JSON recorded as facts.
         if app.health_url:
-            body = await transport.run(["sh", "-c", f"{_CURL_BODY} {app.health_url}"], timeout=15)
+            fetch = f"{_CURL_BODY} {shlex.quote(app.health_url)}"
+            body = await transport.run(["sh", "-c", fetch], timeout=15)
             if body.ok:
                 health = _parse_health_json(body.stdout)
                 if health is not None:
@@ -99,7 +101,7 @@ class HttpHealthCollector(Collector):
 
 async def _probe(transport: Transport, url: str) -> tuple[bool, float, str]:
     """Returns (is_up, response_ms, http_code). 2xx/3xx counts as up."""
-    result = await transport.run(["sh", "-c", f"{_CURL} {url}"], timeout=15)
+    result = await transport.run(["sh", "-c", f"{_CURL} {shlex.quote(url)}"], timeout=15)
     parts = result.stdout.split()
     if not result.ok or len(parts) < 2:
         return False, 0.0, "000"
